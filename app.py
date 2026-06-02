@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from db import load_pedidos, buscar_pedido_por_id, get_opcoes_filtros
+from db import load_pedidos, buscar_pedido_por_id, buscar_pedidos_por_produto, get_opcoes_filtros
 
 st.set_page_config(
     page_title="Entrada Mercadoria",
@@ -166,57 +166,105 @@ with aba_mov:
 # ABA 2 — BUSCAR PEDIDO
 # ══════════════════════════════════════════════════════════════════════════════
 with aba_busca:
-    st.subheader("Buscar Pedido por ID")
+    tipo_busca = st.radio(
+        "Buscar por",
+        ["Número do Pedido", "Código do Produto"],
+        horizontal=True,
+    )
 
-    pid = st.number_input("Número do Pedido", min_value=1, step=1, value=None, placeholder="Digite o ID...")
+    st.divider()
 
-    if pid:
-        try:
-            df_ped, df_itens = buscar_pedido_por_id(int(pid))
-        except Exception as e:
-            st.error(f"Erro ao buscar pedido: {e}")
-            st.stop()
+    # ── Busca por ID do pedido ────────────────────────────────────────────────
+    if tipo_busca == "Número do Pedido":
+        st.subheader("Buscar Pedido por ID")
+        pid = st.number_input("Número do Pedido", min_value=1, step=1, value=None, placeholder="Digite o ID...")
 
-        if df_ped.empty:
-            st.warning(f"Pedido #{int(pid)} não encontrado.")
-        else:
-            row = df_ped.iloc[0]
+        if pid:
+            try:
+                df_ped, df_itens = buscar_pedido_por_id(int(pid))
+            except Exception as e:
+                st.error(f"Erro ao buscar pedido: {e}")
+                st.stop()
 
-            # ── Cabeçalho do pedido ───────────────────────────────────────────
-            st.markdown(f"### Pedido #{int(pid)}")
-
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Status",       str(row.get("status", "-")))
-            c2.metric("Tipo",         str(row.get("tipo_pedido", "-")))
-            c3.metric("Valor Total",  f"R$ {float(row.get('valor_total', 0)):,.2f}")
-            c4.metric("Vendedor",     str(row.get("vendedor", "-") or "-"))
-
-            c5, c6, c7 = st.columns(3)
-            c5.metric("Data",         str(row.get("data", "-"))[:16] if row.get("data") else "-")
-            c6.metric("ID Cliente",   str(row.get("id_cliente", "-")))
-            c7.metric("ID Rota",      str(row.get("id_rota", "-")))
-
-            if row.get("obs"):
-                st.info(f"Observação: {row['obs']}")
-
-            if pd.notna(row.get("cancelado_em")):
-                st.error(f"Pedido cancelado em: {str(row['cancelado_em'])[:16]}")
-
-            st.divider()
-
-            # ── Itens do pedido ───────────────────────────────────────────────
-            st.subheader("Itens do Pedido")
-
-            if df_itens.empty:
-                st.info("Nenhum item encontrado para este pedido.")
+            if df_ped.empty:
+                st.warning(f"Pedido #{int(pid)} não encontrado.")
             else:
-                for col in ["valor_unitario", "valor_total"]:
-                    if col in df_itens.columns:
-                        df_itens[col] = df_itens[col].apply(
+                row = df_ped.iloc[0]
+
+                st.markdown(f"### Pedido #{int(pid)}")
+
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Status",      str(row.get("status", "-")))
+                c2.metric("Tipo",        str(row.get("tipo_pedido", "-")))
+                c3.metric("Valor Total", f"R$ {float(row.get('valor_total', 0)):,.2f}")
+                c4.metric("Vendedor",    str(row.get("vendedor", "-") or "-"))
+
+                c5, c6, c7 = st.columns(3)
+                c5.metric("Data",       str(row.get("data", "-"))[:16] if row.get("data") else "-")
+                c6.metric("ID Cliente", str(row.get("id_cliente", "-")))
+                c7.metric("ID Rota",    str(row.get("id_rota", "-")))
+
+                if row.get("obs"):
+                    st.info(f"Observação: {row['obs']}")
+                if pd.notna(row.get("cancelado_em")):
+                    st.error(f"Pedido cancelado em: {str(row['cancelado_em'])[:16]}")
+
+                st.divider()
+                st.subheader("Itens do Pedido")
+
+                if df_itens.empty:
+                    st.info("Nenhum item encontrado para este pedido.")
+                else:
+                    for col in ["valor_unitario", "valor_total"]:
+                        if col in df_itens.columns:
+                            df_itens[col] = df_itens[col].apply(
+                                lambda v: f"R$ {float(v):,.2f}" if pd.notna(v) else ""
+                            )
+                    st.dataframe(df_itens, use_container_width=True, hide_index=True)
+                    st.caption(f"{len(df_itens)} item(ns)")
+        else:
+            st.info("Digite o número do pedido acima para consultar.")
+
+    # ── Busca por código do produto ───────────────────────────────────────────
+    else:
+        st.subheader("Buscar Pedidos por Código do Produto")
+        cod = st.text_input("Código do Produto", placeholder="Ex: LDT20.0154")
+
+        if cod:
+            try:
+                df_prod = buscar_pedidos_por_produto(cod.strip())
+            except Exception as e:
+                st.error(f"Erro ao buscar produto: {e}")
+                st.stop()
+
+            if df_prod.empty:
+                st.warning(f"Nenhum pedido encontrado com o código '{cod}'.")
+            else:
+                # resumo do produto encontrado
+                nome = df_prod["nome_produto"].iloc[0]
+                cod_real = df_prod["cod_barras"].iloc[0]
+                st.success(f"Produto: **{nome}** — Código: `{cod_real}`")
+
+                k1, k2, k3 = st.columns(3)
+                k1.metric("Pedidos encontrados", f"{df_prod['id'].nunique():,}")
+                k2.metric("Qtd. total vendida",  f"{df_prod['quantidade'].sum():,.0f}")
+                k3.metric("Valor total",          f"R$ {df_prod['valor_item'].sum():,.2f}")
+
+                st.divider()
+
+                # formata colunas
+                show_prod = df_prod.copy()
+                for col in ["valor_unitario", "valor_item"]:
+                    if col in show_prod.columns:
+                        show_prod[col] = show_prod[col].apply(
                             lambda v: f"R$ {float(v):,.2f}" if pd.notna(v) else ""
                         )
+                if "valor_total" in show_prod.columns:
+                    show_prod["valor_total"] = show_prod["valor_total"].apply(
+                        lambda v: f"R$ {float(v):,.2f}" if pd.notna(v) else ""
+                    )
 
-                st.dataframe(df_itens, use_container_width=True, hide_index=True)
-                st.caption(f"{len(df_itens)} item(ns)")
-    else:
-        st.info("Digite o número do pedido acima para consultar.")
+                st.dataframe(show_prod, use_container_width=True, hide_index=True)
+                st.caption(f"{len(show_prod)} linha(s) — {df_prod['id'].nunique()} pedido(s)")
+        else:
+            st.info("Digite o código do produto acima para consultar.")

@@ -112,6 +112,33 @@ def buscar_pedido_por_id(pedido_id: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     return df_pedido, df_itens
 
 
+def buscar_pedidos_por_produto(cod_barras: str) -> pd.DataFrame:
+    engine = get_engine()
+    sql = text("""
+        SELECT
+            p.id,
+            p.data,
+            p.tipo_pedido,
+            p.status,
+            p.valor_total,
+            p.id_cliente,
+            f.nome_completo  AS vendedor,
+            pr.cod_barras,
+            pr.nome_produto,
+            pi.quantidade,
+            pi.valor_unitario,
+            pi.valor_total   AS valor_item
+        FROM pedido_itens pi
+        JOIN pedido p  ON p.id = pi.id_pedido
+        JOIN produto pr ON pr.id_produto = pi.id_produto
+        LEFT JOIN funcionario f ON f.id = p.id_vendedor
+        WHERE pr.cod_barras ILIKE :cod
+        ORDER BY p.data DESC
+    """)
+    with engine.connect() as conn:
+        return pd.read_sql(sql, conn, params={"cod": f"%{cod_barras}%"})
+
+
 def get_opcoes_filtros() -> dict:
     engine = get_engine()
     with engine.connect() as conn:
