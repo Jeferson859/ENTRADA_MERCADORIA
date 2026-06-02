@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from db import load_pedidos, buscar_pedido_por_id, buscar_pedidos_por_produto, get_opcoes_filtros
+from db import load_pedidos, buscar_pedido_por_id, buscar_pedidos_por_produto, load_contagens, load_itens_contagem, get_opcoes_filtros
 
 st.set_page_config(
     page_title="Entrada Mercadoria",
@@ -23,7 +23,7 @@ except Exception as e:
     st.info("Verifique o arquivo `.env` com DB_HOST, DB_PORT, DB_NAME, DB_USER e DB_PASSWORD.")
     st.stop()
 
-aba_mov, aba_busca = st.tabs(["📊 Movimentação", "🔍 Buscar Pedido"])
+aba_mov, aba_busca, aba_ajuste = st.tabs(["📊 Movimentação", "🔍 Buscar Pedido", "📦 Ajuste de Estoque"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -44,7 +44,7 @@ with aba_mov:
         sel_tipo   = st.selectbox("Tipo de Pedido", ["Todos"] + opcoes["tipos"])
 
         vend_df   = opcoes["vendedores"]
-        vend_opts = ["Todos"] + vend_df["nome_completo"].fillna("Sem nome").tolist()
+        vend_opts = ["Todos"] + vend_df["nome_vendedor"].fillna("Sem nome").tolist()
         sel_vend  = st.selectbox("Vendedor", vend_opts)
 
         st.markdown("---")
@@ -55,7 +55,7 @@ with aba_mov:
     # Monta parâmetros
     id_vend = None
     if sel_vend != "Todos":
-        row = vend_df[vend_df["nome_completo"] == sel_vend]
+        row = vend_df[vend_df["nome_vendedor"] == sel_vend]
         if not row.empty:
             id_vend = int(row.iloc[0]["id_vendedor"])
 
@@ -134,31 +134,51 @@ with aba_mov:
         st.plotly_chart(fig3, use_container_width=True)
         st.divider()
 
-    # ── Tabela ────────────────────────────────────────────────────────────────
+    # ── Filtros da tabela ─────────────────────────────────────────────────────
     st.subheader("Lista de Pedidos")
 
-    col_search, col_dl = st.columns([4, 1])
-    with col_search:
-        busca = st.text_input("Buscar na tabela", placeholder="ID, vendedor, status...")
-    with col_dl:
+    fc1, fc2, fc3, fc4, fc5, fc6 = st.columns([1, 2, 2, 2, 2, 1])
+    with fc1:
+        f_id = st.text_input("ID Pedido", placeholder="Ex: 2536")
+    with fc2:
+        f_data = st.date_input("Data", value=None, key="f_data_tab")
+    with fc3:
+        tipos_tab = ["Todos"] + sorted(df["tipo_pedido"].dropna().unique().tolist())
+        f_tipo = st.selectbox("Tipo", tipos_tab, key="f_tipo_tab")
+    with fc4:
+        status_tab = ["Todos"] + sorted(df["status"].dropna().unique().tolist())
+        f_status = st.selectbox("Status", status_tab, key="f_status_tab")
+    with fc5:
+        vend_tab = sorted(df["vendedor"].dropna().unique().tolist())
+        f_vend = st.multiselect("Vendedor", vend_tab, key="f_vend_tab")
+    with fc6:
+        st.markdown("<br>", unsafe_allow_html=True)
         st.download_button(
-            "⬇️ Exportar CSV",
+            "⬇️ CSV",
             data=df.to_csv(index=False).encode("utf-8"),
             file_name="pedidos.csv",
             mime="text/csv",
         )
 
     show = df.copy()
-    if busca:
-        mask = show.astype(str).apply(lambda c: c.str.contains(busca, case=False, na=False)).any(axis=1)
-        show = show[mask]
+    if f_id:
+        show = show[show["id"].astype(str).str.contains(f_id.strip(), case=False, na=False)]
+    if f_data:
+        show["data"] = pd.to_datetime(show["data"], errors="coerce")
+        show = show[show["data"].dt.date == f_data]
+    if f_tipo != "Todos":
+        show = show[show["tipo_pedido"] == f_tipo]
+    if f_status != "Todos":
+        show = show[show["status"] == f_status]
+    if f_vend:
+        show = show[show["vendedor"].isin(f_vend)]
 
     # formata colunas monetárias
-    for col in ["valor_total"]:
-        if col in show.columns:
-            show[col] = show[col].apply(lambda v: f"R$ {float(v):,.2f}" if pd.notna(v) else "")
+    show_fmt = show.copy()
+    if "valor_total" in show_fmt.columns:
+        show_fmt["valor_total"] = show_fmt["valor_total"].apply(lambda v: f"R$ {float(v):,.2f}" if pd.notna(v) else "")
 
-    st.dataframe(show, use_container_width=True, height=420, hide_index=True)
+    st.dataframe(show_fmt, use_container_width=True, height=420, hide_index=True)
     st.caption(f"Exibindo {len(show):,} de {len(df):,} registros")
 
 
@@ -246,7 +266,7 @@ with aba_busca:
                 st.success(f"Produto: **{nome}** — Código: `{cod_real}`")
 
                 k1, k2, k3 = st.columns(3)
-                k1.metric("Pedidos encontrados", f"{df_prod['numero_pedido'].nunique():,}")
+                k1.metric("Pedidos encontrados", f"{df_prod['id_pedido'].nunique():,}")
                 k2.metric("Qtd. total vendida",  f"{df_prod['quantidade'].sum():,.0f}")
                 k3.metric("Valor total",          f"R$ {df_prod['valor_item'].sum():,.2f}")
 
@@ -265,6 +285,134 @@ with aba_busca:
                     )
 
                 st.dataframe(show_prod, use_container_width=True, hide_index=True)
-                st.caption(f"{len(show_prod)} linha(s) — {df_prod['numero_pedido'].nunique()} pedido(s)")
+                st.caption(f"{len(show_prod)} linha(s) — {df_prod['id_pedido'].nunique()} pedido(s)")
         else:
             st.info("Digite o código do produto acima para consultar.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ABA 3 — AJUSTE DE ESTOQUE
+# ══════════════════════════════════════════════════════════════════════════════
+with aba_ajuste:
+    st.subheader("Contagens e Ajustes de Estoque")
+
+    # ── Filtros ───────────────────────────────────────────────────────────────
+    fa1, fa2, fa3 = st.columns([2, 2, 2])
+    with fa1:
+        aj_di = st.date_input("De", value=None, key="aj_ini")
+    with fa2:
+        aj_df = st.date_input("Até", value=None, key="aj_fim")
+    with fa3:
+        aj_status = st.selectbox("Status", ["Todos", "FINALIZADA", "EM_ANDAMENTO", "PENDENTE"], key="aj_st")
+
+    @st.cache_data(ttl=60, show_spinner="Carregando contagens...")
+    def fetch_contagens(di, df, st_val):
+        return load_contagens(
+            data_ini=di,
+            data_fim=df,
+            status=None if st_val == "Todos" else st_val,
+        )
+
+    try:
+        df_cont = fetch_contagens(aj_di, aj_df, aj_status)
+    except Exception as e:
+        st.error(f"Erro ao carregar contagens: {e}")
+        st.stop()
+
+    # ── KPIs ──────────────────────────────────────────────────────────────────
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Total de contagens",    f"{len(df_cont):,}")
+    k2.metric("Total de itens",        f"{df_cont['total_itens'].sum():,.0f}")
+    k3.metric("Itens com divergência", f"{df_cont['itens_divergentes'].sum():,.0f}")
+    saldo = float(df_cont['saldo_ajuste'].sum()) if not df_cont.empty else 0
+    k4.metric("Saldo de ajuste",       f"{saldo:+,.0f} un.")
+
+    st.divider()
+
+    # ── Lista de contagens ────────────────────────────────────────────────────
+    st.subheader("Lista de Contagens")
+
+    if df_cont.empty:
+        st.info("Nenhuma contagem encontrada.")
+    else:
+        show_cont = df_cont.copy()
+        show_cont["saldo_ajuste"] = show_cont["saldo_ajuste"].apply(
+            lambda v: f"{float(v):+,.0f}" if pd.notna(v) else "0"
+        )
+        st.dataframe(show_cont, use_container_width=True, height=280, hide_index=True)
+
+        st.divider()
+
+        # ── Detalhe de uma contagem ───────────────────────────────────────────
+        st.subheader("Detalhe da Contagem")
+
+        ids_disponiveis = df_cont["id"].tolist()
+        id_sel = st.selectbox(
+            "Selecione a contagem",
+            ids_disponiveis,
+            format_func=lambda x: f"#{x} — {df_cont[df_cont['id']==x]['obs'].values[0] or 'sem obs.'} ({df_cont[df_cont['id']==x]['data'].values[0]})",
+        )
+
+        if id_sel:
+            @st.cache_data(ttl=60, show_spinner="Carregando itens...")
+            def fetch_itens(cid):
+                return load_itens_contagem(cid)
+
+            df_itens_cont = fetch_itens(int(id_sel))
+
+            if df_itens_cont.empty:
+                st.info("Nenhum item encontrado para esta contagem.")
+            else:
+                total_itens = len(df_itens_cont)
+                com_div     = (df_itens_cont["diferenca"] != 0).sum()
+                positivos   = (df_itens_cont["diferenca"] > 0).sum()
+                negativos   = (df_itens_cont["diferenca"] < 0).sum()
+
+                d1, d2, d3, d4 = st.columns(4)
+                d1.metric("Total de itens",   f"{total_itens:,}")
+                d2.metric("Com divergência",  f"{com_div:,}")
+                d3.metric("Sobra (física>sistema)", f"{positivos:,}")
+                d4.metric("Falta (física<sistema)", f"{negativos:,}")
+
+                # gráfico top divergências
+                top = df_itens_cont[df_itens_cont["diferenca"] != 0].head(20).copy()
+                if not top.empty:
+                    top["cor"] = top["diferenca"].apply(lambda v: "Sobra" if v > 0 else "Falta")
+                    fig_div = px.bar(
+                        top,
+                        x="diferenca",
+                        y="nome_produto",
+                        orientation="h",
+                        color="cor",
+                        color_discrete_map={"Sobra": "#27AE60", "Falta": "#E74C3C"},
+                        text="diferenca",
+                        title="Top divergências (física − sistema)",
+                        labels={"diferenca": "Diferença", "nome_produto": "", "cor": ""},
+                    )
+                    fig_div.update_traces(textposition="outside", texttemplate="%{text:+.0f}")
+                    fig_div.update_layout(height=max(300, len(top) * 30), margin=dict(t=40, b=10, l=10, r=80))
+                    st.plotly_chart(fig_div, use_container_width=True)
+
+                # tabela detalhada com highlight
+                st.subheader("Itens da Contagem")
+
+                busca_item = st.text_input("Buscar produto", placeholder="Nome ou código...", key="busca_item")
+                df_show_item = df_itens_cont.copy()
+                if busca_item:
+                    mask = df_show_item.astype(str).apply(lambda c: c.str.contains(busca_item, case=False, na=False)).any(axis=1)
+                    df_show_item = df_show_item[mask]
+
+                def highlight_diff(row):
+                    diff = row.get("diferenca", 0)
+                    if diff > 0:
+                        return ["background-color: #D5F5E3; color: #1A1A1A"] * len(row)
+                    if diff < 0:
+                        return ["background-color: #FADBD8; color: #1A1A1A"] * len(row)
+                    return [""] * len(row)
+
+                styled_itens = df_show_item.style.apply(highlight_diff, axis=1)
+                st.dataframe(styled_itens, use_container_width=True, height=420, hide_index=True)
+                st.caption(
+                    f"Exibindo {len(df_show_item):,} de {total_itens:,} itens  |  "
+                    "Verde = sobra · Vermelho = falta"
+                )
