@@ -116,7 +116,7 @@ def buscar_pedidos_por_produto(cod_barras: str) -> pd.DataFrame:
     engine = get_engine()
     sql = text("""
         SELECT
-            p.id,
+            p.id            AS numero_pedido,
             p.data,
             p.tipo_pedido,
             p.status,

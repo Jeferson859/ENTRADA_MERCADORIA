@@ -246,7 +246,7 @@ with aba_busca:
                 st.success(f"Produto: **{nome}** — Código: `{cod_real}`")
 
                 k1, k2, k3 = st.columns(3)
-                k1.metric("Pedidos encontrados", f"{df_prod['id'].nunique():,}")
+                k1.metric("Pedidos encontrados", f"{df_prod['numero_pedido'].nunique():,}")
                 k2.metric("Qtd. total vendida",  f"{df_prod['quantidade'].sum():,.0f}")
                 k3.metric("Valor total",          f"R$ {df_prod['valor_item'].sum():,.2f}")
 
@@ -265,6 +265,6 @@ with aba_busca:
                     )
 
                 st.dataframe(show_prod, use_container_width=True, hide_index=True)
-                st.caption(f"{len(show_prod)} linha(s) — {df_prod['id'].nunique()} pedido(s)")
+                st.caption(f"{len(show_prod)} linha(s) — {df_prod['numero_pedido'].nunique()} pedido(s)")
         else:
             st.info("Digite o código do produto acima para consultar.")
