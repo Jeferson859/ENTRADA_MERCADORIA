@@ -6,6 +6,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def _get_secret(key: str, default: str = None):
+    try:
+        import streamlit as st
+        return st.secrets.get(key, os.getenv(key, default))
+    except Exception:
+        return os.getenv(key, default)
+
 # CTE que extrai o mapeamento correto id_vendedor → nome_vendedor via view
 _VENDEDOR_CTE = """
     vendedor_map AS (
@@ -17,14 +24,14 @@ _VENDEDOR_CTE = """
 
 
 def get_engine():
-    host = os.getenv("DB_HOST", "localhost")
-    port = os.getenv("DB_PORT", "5432")
-    name = os.getenv("DB_NAME")
-    user = os.getenv("DB_USER")
-    password = os.getenv("DB_PASSWORD")
+    host     = _get_secret("DB_HOST", "localhost")
+    port     = _get_secret("DB_PORT", "5432")
+    name     = _get_secret("DB_NAME")
+    user     = _get_secret("DB_USER")
+    password = _get_secret("DB_PASSWORD")
 
     if not all([name, user, password]):
-        raise ValueError("Credenciais incompletas. Verifique o arquivo .env.")
+        raise ValueError("Credenciais incompletas. Verifique o arquivo .env ou os Secrets do Streamlit Cloud.")
 
     url = f"postgresql+psycopg2://{quote_plus(user)}:{quote_plus(password)}@{host}:{port}/{name}"
     return create_engine(url)
