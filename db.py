@@ -151,6 +151,20 @@ def buscar_pedidos_por_produto(cod_barras: str) -> pd.DataFrame:
         return pd.read_sql(sql, conn, params={"cod": f"%{cod_barras}%"})
 
 
+def buscar_ids_por_produto(termo: str) -> list[int]:
+    engine = get_engine()
+    sql = text("""
+        SELECT DISTINCT pi.id_pedido
+        FROM pedido_itens pi
+        JOIN produto pr ON pr.id_produto = pi.id_produto
+        WHERE pr.nome_produto ILIKE :termo
+           OR pr.cod_barras   ILIKE :termo
+    """)
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"termo": f"%{termo}%"})
+    return df["id_pedido"].tolist()
+
+
 def load_contagens(data_ini=None, data_fim=None, status=None) -> pd.DataFrame:
     engine = get_engine()
     clauses = ["1=1"]

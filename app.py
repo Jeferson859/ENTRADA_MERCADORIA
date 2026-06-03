@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from db import load_pedidos, buscar_pedido_por_id, buscar_pedidos_por_produto, load_contagens, load_itens_contagem, get_opcoes_filtros
+from db import load_pedidos, buscar_pedido_por_id, buscar_pedidos_por_produto, buscar_ids_por_produto, load_contagens, load_itens_contagem, get_opcoes_filtros
 
 st.set_page_config(
     page_title="Entrada Mercadoria",
@@ -137,6 +137,12 @@ with aba_mov:
     # ── Filtros da tabela ─────────────────────────────────────────────────────
     st.subheader("Lista de Pedidos")
 
+    fb1, fb2 = st.columns([3, 3])
+    with fb1:
+        f_busca = st.text_input("🔎 Buscar pedido", placeholder="Digite qualquer informação: ID, cliente, observação...")
+    with fb2:
+        f_produto = st.text_input("📦 Buscar por produto", placeholder="Nome ou código do produto...")
+
     fc1, fc2, fc3, fc4, fc5, fc6 = st.columns([1, 2, 2, 2, 2, 1])
     with fc1:
         f_id = st.text_input("ID Pedido", placeholder="Ex: 2536")
@@ -161,6 +167,12 @@ with aba_mov:
         )
 
     show = df.copy()
+    if f_busca:
+        mask = show.astype(str).apply(lambda c: c.str.contains(f_busca.strip(), case=False, na=False)).any(axis=1)
+        show = show[mask]
+    if f_produto:
+        ids_prod = buscar_ids_por_produto(f_produto.strip())
+        show = show[show["id"].isin(ids_prod)]
     if f_id:
         show = show[show["id"].astype(str).str.contains(f_id.strip(), case=False, na=False)]
     if f_data:
