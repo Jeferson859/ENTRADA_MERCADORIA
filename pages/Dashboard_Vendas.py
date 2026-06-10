@@ -5,9 +5,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 
-st.set_page_config(page_title="Dashboard de Vendas", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Dashboard de Vendas", page_icon="ð", layout="wide")
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
+# ââ CSS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 st.markdown("""<style>
 .block-container{padding-top:.7rem;padding-bottom:.5rem;max-width:100%}
 .kpi-card{
@@ -33,7 +33,7 @@ h3{font-size:.8rem!important;text-transform:uppercase;letter-spacing:.09em;
 hr{border-color:rgba(123,97,255,.15)!important;margin:.6rem 0!important}
 </style>""", unsafe_allow_html=True)
 
-# ── CONSTANTES ────────────────────────────────────────────────────────────────
+# ââ CONSTANTES ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 PURPLE = "#7B61FF"; CYAN = "#00D4FF"; GREEN = "#00FF94"
 AMBER  = "#FFB800"; RED  = "#FF6B6B"
 SEQ    = [PURPLE,"#5B8EFF",CYAN,"#00FFB8",GREEN,"#B0FF66",AMBER,RED]
@@ -46,7 +46,7 @@ PL = dict(
     margin=dict(l=0,r=4,t=30,b=0),
 )
 
-# ── DB ────────────────────────────────────────────────────────────────────────
+# ââ DB ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 @st.cache_resource
 def get_conn():
     return psycopg2.connect(
@@ -58,13 +58,13 @@ def get_conn():
 def Q(sql):
     return pd.read_sql(sql, get_conn())
 
-# ── HELPERS ───────────────────────────────────────────────────────────────────
+# ââ HELPERS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 def brl(v):  return f"R$ {v:,.0f}".replace(",",".")
 def brls(v): return f"R${v/1000:.0f}k" if v>=1000 else f"R${v:.0f}"
 def badge(v, p25, p75):
-    if v >= p75: return "🟢 Alto"
-    if v >= p25: return "🟡 Médio"
-    return "🔴 Baixo"
+    if v >= p75: return "ð¢ Alto"
+    if v >= p25: return "ð¡ MÃ©dio"
+    return "ð´ Baixo"
 
 def _sparksvg(series, color, w=80, h=28):
     pts = [float(x) for x in list(series) if pd.notna(x)][-20:]
@@ -91,20 +91,20 @@ def kpi(col, label, value, series=None, color=CYAN, sub=None):
             f'<div>{spark}</div></div>',
             unsafe_allow_html=True)
 
-# ── HEADER ────────────────────────────────────────────────────────────────────
+# ââ HEADER ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 st.markdown(
-    f'## 📊 Dashboard de Vendas — SGV&nbsp;&nbsp;'
+    f'## ð Dashboard de Vendas â SGV&nbsp;&nbsp;'
     f'<span style="font-size:.75rem;color:#8B92A5;font-weight:400">'
     f'Atualizado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
-    f' · PRE-VENDA válidos · cache 10 min</span>',
+    f' Â· PRE-VENDA vÃ¡lidos Â· cache 10 min</span>',
     unsafe_allow_html=True)
 
-tabs = st.tabs(["🛣️ Rotas","👥 Faixa Etária",
-                "🧑‍💼 Vendedor × Estado","🎁 Produtos BRINDE","🛒 Produtos PRE-VENDA"])
+tabs = st.tabs(["ð£ï¸ Rotas","ð¥ Faixa EtÃ¡ria",
+                "ð§âð¼ Vendedor Ã Estado","ð Produtos BRINDE","ð Produtos PRE-VENDA"])
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 1 – ROTAS
-# ════════════════════════════════════════════════════════════════════════════
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# TAB 1 â ROTAS
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 with tabs[0]:
     rotas = Q("""
         SELECT r.nome_rota AS rota,
@@ -132,32 +132,41 @@ with tabs[0]:
         GROUP BY semana ORDER BY semana
     """)
 
+    # KPIs
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Total de Rotas",     str(len(rotas)),               trend.pedidos,     PURPLE)
-    kpi(c2, "Faturamento Total",  brl(rotas.fat_total.sum()),    trend.faturamento, CYAN)
-    kpi(c3, "Ticket Médio Geral", brl(rotas.ticket.mean()),      trend.faturamento, GREEN)
+    kpi(c1, "Total de Rotas",      str(len(rotas)),
+        trend.pedidos, PURPLE)
+    kpi(c2, "Faturamento Total",   brl(rotas.fat_total.sum()),
+        trend.faturamento, CYAN)
+    kpi(c3, "Ticket MÃ©dio Geral",  brl(rotas.ticket.mean()),
+        trend.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
-    st.markdown("### 📈 Tendência Semanal — Faturamento PRE-VENDA")
+    # Trend sparkline
+    st.markdown("### ð TendÃªncia Semanal â Faturamento PRE-VENDA")
     ft = go.Figure(go.Scatter(
         x=trend.semana, y=trend.faturamento, mode='lines+markers',
         line=dict(color=CYAN, width=2.5), marker=dict(size=5, color=PURPLE),
         fill='tozeroy', fillcolor='rgba(123,97,255,.08)',
         hovertemplate='%{x|%d/%m/%y}<br>R$ %{y:,.0f}<extra></extra>'))
     ft.update_layout(**PL, height=160, showlegend=False)
-    ft.update_xaxes(tickformat='%b/%y', tickfont=dict(size=9), gridcolor='rgba(255,255,255,.05)')
-    ft.update_yaxes(tickformat=',.0f',  tickfont=dict(size=9), gridcolor='rgba(255,255,255,.05)')
+    ft.update_xaxes(tickformat='%b/%y', tickfont=dict(size=9),
+                    gridcolor='rgba(255,255,255,.05)')
+    ft.update_yaxes(tickformat=',.0f', tickfont=dict(size=9),
+                    gridcolor='rgba(255,255,255,.05)')
     st.plotly_chart(ft, use_container_width=True)
     st.markdown("---")
 
+    # Bar + Table
     p25 = rotas.fat_sem.quantile(.25); p75 = rotas.fat_sem.quantile(.75)
     ca, cb = st.columns([5, 6])
     with ca:
-        st.markdown("### Top 20 Rotas — Média Semanal (R$)")
+        st.markdown("### Top 20 Rotas â MÃ©dia Semanal (R$)")
         d20 = rotas.head(20)
         fb = go.Figure(go.Bar(
             x=d20.fat_sem, y=d20.rota, orientation='h',
-            marker=dict(color=d20.fat_sem, colorscale=HEAT, showscale=False, line=dict(width=0)),
+            marker=dict(color=d20.fat_sem, colorscale=HEAT,
+                        showscale=False, line=dict(width=0)),
             text=d20.fat_sem.apply(brls), textposition='outside',
             textfont=dict(size=9, color='#8B92A5')))
         fb.update_layout(**PL, height=560)
@@ -165,34 +174,36 @@ with tabs[0]:
         fb.update_xaxes(visible=False)
         st.plotly_chart(fb, use_container_width=True)
     with cb:
-        st.markdown("### Visão Detalhada por Rota")
+        st.markdown("### VisÃ£o Detalhada por Rota")
         rt = rotas.copy()
         rt['Status'] = rt.fat_sem.apply(lambda v: badge(v, p25, p75))
+        rt['fat_sem'] = rt['fat_sem'].apply(brl)
+        rt['ticket']  = rt['ticket'].apply(brl)
         rt.index = range(1, len(rt)+1); rt.index.name = 'Pos.'
         st.dataframe(
             rt[['rota','ped_sem','fat_sem','ticket','Status']].rename(columns={
-                'rota':'Rota','ped_sem':'Ped/Sem','fat_sem':'Fat/Sem (R$)',
-                'ticket':'Ticket','Status':'Status'}),
+                'rota':'Rota','ped_sem':'Ped/Sem',
+                'fat_sem':'Fat/Sem (R$)','ticket':'Ticket MÃ©dio','Status':'Status'}),
             height=560, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 2 – FAIXA ETÁRIA
-# ════════════════════════════════════════════════════════════════════════════
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# TAB 2 â FAIXA ETÃRIA
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 with tabs[1]:
     fe = Q("""
         SELECT
             CASE
-                WHEN DATE_PART('year',AGE(c.data_nascimento)) < 18              THEN 'Menor 18'
+                WHEN DATE_PART('year',AGE(c.data_nascimento)) < 18          THEN 'Menor 18'
                 WHEN DATE_PART('year',AGE(c.data_nascimento)) BETWEEN 18 AND 25 THEN '18-25'
                 WHEN DATE_PART('year',AGE(c.data_nascimento)) BETWEEN 26 AND 35 THEN '26-35'
                 WHEN DATE_PART('year',AGE(c.data_nascimento)) BETWEEN 36 AND 45 THEN '36-45'
                 WHEN DATE_PART('year',AGE(c.data_nascimento)) BETWEEN 46 AND 60 THEN '46-60'
                 ELSE '+60'
             END AS faixa,
-            COUNT(DISTINCT c.id_cliente)         AS clientes,
-            COUNT(p.id)                          AS pedidos,
-            ROUND(AVG(p.valor_total)::numeric,2) AS ticket,
-            ROUND(SUM(p.valor_total)::numeric,2) AS faturamento
+            COUNT(DISTINCT c.id_cliente)            AS clientes,
+            COUNT(p.id)                             AS pedidos,
+            ROUND(AVG(p.valor_total)::numeric,2)    AS ticket,
+            ROUND(SUM(p.valor_total)::numeric,2)    AS faturamento
         FROM clientes c
         JOIN pedido p ON p.id_cliente = c.id_cliente
         WHERE c.data_nascimento IS NOT NULL
@@ -203,37 +214,43 @@ with tabs[1]:
         ORDER BY MIN(DATE_PART('year',AGE(c.data_nascimento)))
     """)
 
-    imc = fe.clientes.idxmax()
+    imc = fe.clientes.idxmax(); imt = fe.ticket.idxmax()
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Faixas Mapeadas", str(len(fe)), fe.clientes, PURPLE)
-    kpi(c2, "Total Clientes",  f"{int(fe.clientes.sum()):,}".replace(",","."), fe.faturamento, CYAN)
-    kpi(c3, "Faixa Dominante", fe.loc[imc,'faixa'], fe.clientes, GREEN,
+    kpi(c1, "Faixas Mapeadas",  str(len(fe)), fe.clientes, PURPLE)
+    kpi(c2, "Total Clientes",
+        f"{int(fe.clientes.sum()):,}".replace(",","."), fe.faturamento, CYAN)
+    kpi(c3, "Faixa Dominante",  fe.loc[imc,'faixa'], fe.clientes, GREEN,
         f"{int(fe.clientes.max()):,}".replace(",",".")+" clientes")
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
     st.markdown("---")
 
     ca, cb, cc = st.columns([4, 4, 3])
     with ca:
-        st.markdown("### Ticket Médio por Faixa")
+        st.markdown("### Ticket MÃ©dio por Faixa")
         fg = go.Figure(go.Bar(
             x=fe.faixa, y=fe.ticket,
-            marker=dict(color=fe.ticket, colorscale=HEAT_GREEN, showscale=False, line=dict(width=0)),
+            marker=dict(color=fe.ticket, colorscale=HEAT_GREEN,
+                        showscale=False, line=dict(width=0)),
             text=fe.ticket.apply(lambda v: f"R${v:,.0f}".replace(",",".")),
             textposition='outside', textfont=dict(size=10)))
         fg.update_layout(**PL, height=340)
-        fg.update_xaxes(tickfont=dict(size=11)); fg.update_yaxes(visible=False)
+        fg.update_xaxes(tickfont=dict(size=11))
+        fg.update_yaxes(visible=False)
         st.plotly_chart(fg, use_container_width=True)
     with cb:
         st.markdown("### Faturamento por Faixa")
         fg2 = go.Figure(go.Bar(
             x=fe.faixa, y=fe.faturamento,
-            marker=dict(color=fe.faturamento, colorscale=HEAT, showscale=False, line=dict(width=0)),
-            text=fe.faturamento.apply(brls), textposition='outside', textfont=dict(size=10)))
+            marker=dict(color=fe.faturamento, colorscale=HEAT,
+                        showscale=False, line=dict(width=0)),
+            text=fe.faturamento.apply(brls),
+            textposition='outside', textfont=dict(size=10)))
         fg2.update_layout(**PL, height=340)
-        fg2.update_xaxes(tickfont=dict(size=11)); fg2.update_yaxes(visible=False)
+        fg2.update_xaxes(tickfont=dict(size=11))
+        fg2.update_yaxes(visible=False)
         st.plotly_chart(fg2, use_container_width=True)
     with cc:
-        st.markdown("### Distribuição")
+        st.markdown("### DistribuiÃ§Ã£o")
         fg3 = go.Figure(go.Pie(
             labels=fe.faixa, values=fe.clientes, hole=0.6,
             marker=dict(colors=SEQ[:len(fe)], line=dict(width=0)),
@@ -244,22 +261,26 @@ with tabs[1]:
         st.plotly_chart(fg3, use_container_width=True)
 
     st.markdown("---")
-    st.dataframe(fe.rename(columns={'faixa':'Faixa','clientes':'Clientes','pedidos':'Pedidos',
-        'ticket':'Ticket Médio (R$)','faturamento':'Faturamento (R$)'}),
+    fe_disp = fe.copy()
+    fe_disp['ticket']     = fe_disp['ticket'].apply(brl)
+    fe_disp['faturamento']= fe_disp['faturamento'].apply(brl)
+    st.dataframe(fe_disp.rename(columns={
+        'faixa':'Faixa','clientes':'Clientes','pedidos':'Pedidos',
+        'ticket':'Ticket MÃ©dio','faturamento':'Faturamento'}),
         use_container_width=True, hide_index=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 3 – VENDEDOR × ESTADO
-# ════════════════════════════════════════════════════════════════════════════
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# TAB 3 â VENDEDOR Ã ESTADO
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 with tabs[2]:
     vd = Q("""
         SELECT v.nome_vendedor AS vendedor,
             CASE
-                WHEN c.cep_cliente ~ '^\\d{5}'
+                WHEN c.cep_cliente ~ '^\d{5}'
                  AND CAST(LEFT(c.cep_cliente,5) AS BIGINT) BETWEEN 66000 AND 68999 THEN 'PA'
-                WHEN c.cep_cliente ~ '^\\d{5}'
+                WHEN c.cep_cliente ~ '^\d{5}'
                  AND CAST(LEFT(c.cep_cliente,5) AS BIGINT) BETWEEN 78000 AND 78999 THEN 'MT'
-                WHEN c.cep_cliente ~ '^\\d{5}'
+                WHEN c.cep_cliente ~ '^\d{5}'
                  AND CAST(LEFT(c.cep_cliente,5) AS BIGINT) BETWEEN 74000 AND 76999 THEN 'GO'
                 ELSE 'Outro'
             END AS estado,
@@ -274,7 +295,7 @@ with tabs[2]:
           AND p.tipo_pedido = 'PRE-VENDA'
           AND c.deleted_at IS NULL
           AND c.cep_cliente IS NOT NULL AND c.cep_cliente != ''
-          AND c.cep_cliente ~ '^\\d'
+          AND c.cep_cliente ~ '^\d'
         GROUP BY v.nome_vendedor, estado
         ORDER BY faturamento DESC
     """)
@@ -284,50 +305,58 @@ with tabs[2]:
              .sort_values('fat', ascending=False))
 
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Vendedores",       str(vd.vendedor.nunique()), res.fat, PURPLE)
+    kpi(c1, "Vendedores",      str(vd.vendedor.nunique()), res.fat, PURPLE)
     kpi(c2, "Faturamento Total", brl(vd.faturamento.sum()), res.fat, CYAN)
     if len(res) > 0:
-        kpi(c3, "Top Vendedor", res.index[0][:22], res.fat, GREEN, brl(res.fat.iloc[0]))
+        kpi(c3, "Top Vendedor", res.index[0][:22], res.fat, GREEN,
+            brl(res.fat.iloc[0]))
     else:
-        kpi(c3, "Top Vendedor", "—", None, GREEN)
+        kpi(c3, "Top Vendedor", "â", None, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
     st.markdown("---")
 
     ca, cb = st.columns([3, 2])
     with ca:
-        st.markdown("### 🗺️ Heatmap — Faturamento por Vendedor × Estado")
-        pivot = vd.pivot_table(values='faturamento', index='vendedor',
-                               columns='estado', aggfunc='sum', fill_value=0)
+        st.markdown("### ðºï¸ Heatmap â Faturamento por Vendedor Ã Estado")
+        pivot = vd.pivot_table(
+            values='faturamento', index='vendedor', columns='estado',
+            aggfunc='sum', fill_value=0)
         pivot['_t'] = pivot.sum(axis=1)
-        pivot = pivot.sort_values('_t', ascending=False).drop(columns='_t').head(20)
+        pivot = (pivot.sort_values('_t', ascending=False)
+                      .drop(columns='_t').head(20))
         z_text = pivot.map(lambda v: brls(v) if v > 0 else "")
         fh = px.imshow(pivot, color_continuous_scale=HEAT, aspect='auto', zmin=0)
-        fh.update_traces(text=z_text.values, texttemplate="%{text}",
-                         textfont=dict(size=9),
-                         hovertemplate='%{y} × %{x}<br>R$ %{z:,.0f}<extra></extra>')
+        fh.update_traces(
+            text=z_text.values, texttemplate="%{text}",
+            textfont=dict(size=9),
+            hovertemplate='%{y} Ã %{x}<br>R$ %{z:,.0f}<extra></extra>')
         fh.update_layout(**PL, height=520, coloraxis_showscale=False)
         fh.update_xaxes(tickfont=dict(size=11), side='top')
         fh.update_yaxes(tickfont=dict(size=9))
         st.plotly_chart(fh, use_container_width=True)
     with cb:
         st.markdown("### Ranking de Vendedores")
-        st.dataframe(res.rename(columns={'fat':'Faturamento (R$)','ped':'Pedidos',
-            'cli':'Clientes','ticket':'Ticket Médio'}),
+        res_disp = res.copy()
+        res_disp['fat']    = res_disp['fat'].apply(brl)
+        res_disp['ticket'] = res_disp['ticket'].apply(brl)
+        st.dataframe(res_disp.rename(columns={
+            'fat':'Faturamento','ped':'Pedidos',
+            'cli':'Clientes','ticket':'Ticket MÃ©dio'}),
             height=520, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 4 – BRINDES
-# ════════════════════════════════════════════════════════════════════════════
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# TAB 4 â BRINDES
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 with tabs[3]:
     br = Q("""
         SELECT pr.nome_produto AS produto,
-            SUM(pi.quantidade)                       AS qtd,
-            COUNT(DISTINCT p.id)                     AS pedidos,
+            SUM(pi.quantidade)                      AS qtd,
+            COUNT(DISTINCT p.id)                    AS pedidos,
             ROUND(AVG(pi.valor_unitario)::numeric,2) AS preco,
-            ROUND(SUM(pi.valor_total)::numeric,2)    AS valor_total
+            ROUND(SUM(pi.valor_total)::numeric,2)   AS valor_total
         FROM pedido p
-        JOIN pedido_itens pi ON pi.id_pedido  = p.id
-        JOIN produto      pr ON pr.id_produto = pi.id_produto
+        JOIN pedido_itens pi ON pi.id_pedido   = p.id
+        JOIN produto      pr ON pr.id_produto  = pi.id_produto
         WHERE p.tipo_pedido = 'BRINDE'
           AND p.cancelado_em IS NULL AND p.status != 'CANCELADO'
         GROUP BY pr.nome_produto
@@ -335,9 +364,10 @@ with tabs[3]:
     """)
 
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Produtos Distintos", str(len(br)),                           br.qtd,        AMBER)
-    kpi(c2, "Unidades Doadas",    f"{int(br.qtd.sum()):,}".replace(",","."), br.qtd,     RED)
-    kpi(c3, "Valor Total",        brl(br.valor_total.sum()),              br.valor_total, PURPLE)
+    kpi(c1, "Produtos Distintos", str(len(br)), br.qtd, AMBER)
+    kpi(c2, "Unidades Doadas",
+        f"{int(br.qtd.sum()):,}".replace(",","."), br.qtd, RED)
+    kpi(c3, "Valor Total", brl(br.valor_total.sum()), br.valor_total, PURPLE)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
     st.markdown("---")
 
@@ -357,23 +387,27 @@ with tabs[3]:
         st.plotly_chart(fbar, use_container_width=True)
     with cb:
         st.markdown("### Lista Completa")
-        st.dataframe(br.rename(columns={'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
-            'preco':'Preço Médio (R$)','valor_total':'Valor Total (R$)'}),
+        br_disp = br.copy()
+        br_disp['preco']       = br_disp['preco'].apply(brl)
+        br_disp['valor_total'] = br_disp['valor_total'].apply(brl)
+        st.dataframe(br_disp.rename(columns={
+            'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
+            'preco':'PreÃ§o MÃ©dio','valor_total':'Valor Total'}),
             height=490, use_container_width=True, hide_index=True)
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 5 – PRE-VENDA
-# ════════════════════════════════════════════════════════════════════════════
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# TAB 5 â PRE-VENDA
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 with tabs[4]:
     pv = Q("""
         SELECT pr.nome_produto AS produto,
-            SUM(pi.quantidade)                       AS qtd,
-            COUNT(DISTINCT p.id)                     AS pedidos,
+            SUM(pi.quantidade)                      AS qtd,
+            COUNT(DISTINCT p.id)                    AS pedidos,
             ROUND(AVG(pi.valor_unitario)::numeric,2) AS preco,
-            ROUND(SUM(pi.valor_total)::numeric,2)    AS faturamento
+            ROUND(SUM(pi.valor_total)::numeric,2)   AS faturamento
         FROM pedido p
-        JOIN pedido_itens pi ON pi.id_pedido  = p.id
-        JOIN produto      pr ON pr.id_produto = pi.id_produto
+        JOIN pedido_itens pi ON pi.id_pedido   = p.id
+        JOIN produto      pr ON pr.id_produto  = pi.id_produto
         WHERE p.tipo_pedido = 'PRE-VENDA'
           AND p.cancelado_em IS NULL AND p.status != 'CANCELADO'
         GROUP BY pr.nome_produto
@@ -381,19 +415,20 @@ with tabs[4]:
     """)
 
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Produtos Distintos", str(len(pv)),                              pv.qtd,       PURPLE)
-    kpi(c2, "Unidades Vendidas",  f"{int(pv.qtd.sum()):,}".replace(",","."), pv.faturamento, CYAN)
-    kpi(c3, "Faturamento Total",  brl(pv.faturamento.sum()),                 pv.faturamento, GREEN)
+    kpi(c1, "Produtos Distintos", str(len(pv)), pv.qtd, PURPLE)
+    kpi(c2, "Unidades Vendidas",
+        f"{int(pv.qtd.sum()):,}".replace(",","."), pv.faturamento, CYAN)
+    kpi(c3, "Faturamento Total", brl(pv.faturamento.sum()), pv.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
-    busca = st.text_input("🔍 Buscar produto", "", key="busca_pv",
+    busca = st.text_input("ð Buscar produto", "", key="busca_pv",
                           placeholder="Digite parte do nome...")
     dff = pv[pv.produto.str.contains(busca, case=False, na=False)] if busca else pv
     st.markdown("---")
 
     ca, cb = st.columns([3, 4])
     with ca:
-        st.markdown("### Top 15 Produtos — Faturamento")
+        st.markdown("### Top 15 Produtos â Faturamento")
         d15 = dff.head(15)
         fpv = go.Figure(go.Bar(
             x=d15.faturamento, y=d15.produto, orientation='h',
@@ -407,6 +442,10 @@ with tabs[4]:
         st.plotly_chart(fpv, use_container_width=True)
     with cb:
         st.markdown("### Ranking Completo")
-        st.dataframe(dff.rename(columns={'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
-            'preco':'Preço Médio (R$)','faturamento':'Faturamento (R$)'}),
+        dff_disp = dff.copy()
+        dff_disp['preco']       = dff_disp['preco'].apply(brl)
+        dff_disp['faturamento'] = dff_disp['faturamento'].apply(brl)
+        st.dataframe(dff_disp.rename(columns={
+            'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
+            'preco':'PreÃ§o MÃ©dio','faturamento':'Faturamento'}),
             height=490, use_container_width=True, hide_index=True)
