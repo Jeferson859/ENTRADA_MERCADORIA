@@ -44,7 +44,6 @@ PL = dict(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     font=dict(color="#C4C9D4", size=11, family="Inter,sans-serif"),
     margin=dict(l=0,r=4,t=30,b=0),
-    legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10))
 )
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -133,17 +132,12 @@ with tabs[0]:
         GROUP BY semana ORDER BY semana
     """)
 
-    # KPIs
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Total de Rotas",      str(len(rotas)),
-        trend.pedidos, PURPLE)
-    kpi(c2, "Faturamento Total",   brl(rotas.fat_total.sum()),
-        trend.faturamento, CYAN)
-    kpi(c3, "Ticket Médio Geral",  brl(rotas.ticket.mean()),
-        trend.faturamento, GREEN)
+    kpi(c1, "Total de Rotas",     str(len(rotas)),               trend.pedidos,     PURPLE)
+    kpi(c2, "Faturamento Total",  brl(rotas.fat_total.sum()),    trend.faturamento, CYAN)
+    kpi(c3, "Ticket Médio Geral", brl(rotas.ticket.mean()),      trend.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
-    # Trend sparkline
     st.markdown("### 📈 Tendência Semanal — Faturamento PRE-VENDA")
     ft = go.Figure(go.Scatter(
         x=trend.semana, y=trend.faturamento, mode='lines+markers',
@@ -151,14 +145,11 @@ with tabs[0]:
         fill='tozeroy', fillcolor='rgba(123,97,255,.08)',
         hovertemplate='%{x|%d/%m/%y}<br>R$ %{y:,.0f}<extra></extra>'))
     ft.update_layout(**PL, height=160, showlegend=False)
-    ft.update_xaxes(tickformat='%b/%y', tickfont=dict(size=9),
-                    gridcolor='rgba(255,255,255,.05)')
-    ft.update_yaxes(tickformat=',.0f', tickfont=dict(size=9),
-                    gridcolor='rgba(255,255,255,.05)')
+    ft.update_xaxes(tickformat='%b/%y', tickfont=dict(size=9), gridcolor='rgba(255,255,255,.05)')
+    ft.update_yaxes(tickformat=',.0f',  tickfont=dict(size=9), gridcolor='rgba(255,255,255,.05)')
     st.plotly_chart(ft, use_container_width=True)
     st.markdown("---")
 
-    # Bar + Table
     p25 = rotas.fat_sem.quantile(.25); p75 = rotas.fat_sem.quantile(.75)
     ca, cb = st.columns([5, 6])
     with ca:
@@ -166,8 +157,7 @@ with tabs[0]:
         d20 = rotas.head(20)
         fb = go.Figure(go.Bar(
             x=d20.fat_sem, y=d20.rota, orientation='h',
-            marker=dict(color=d20.fat_sem, colorscale=HEAT,
-                        showscale=False, line=dict(width=0)),
+            marker=dict(color=d20.fat_sem, colorscale=HEAT, showscale=False, line=dict(width=0)),
             text=d20.fat_sem.apply(brls), textposition='outside',
             textfont=dict(size=9, color='#8B92A5')))
         fb.update_layout(**PL, height=560)
@@ -181,8 +171,8 @@ with tabs[0]:
         rt.index = range(1, len(rt)+1); rt.index.name = 'Pos.'
         st.dataframe(
             rt[['rota','ped_sem','fat_sem','ticket','Status']].rename(columns={
-                'rota':'Rota','ped_sem':'Ped/Sem',
-                'fat_sem':'Fat/Sem (R$)','ticket':'Ticket','Status':'Status'}),
+                'rota':'Rota','ped_sem':'Ped/Sem','fat_sem':'Fat/Sem (R$)',
+                'ticket':'Ticket','Status':'Status'}),
             height=560, use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -192,17 +182,17 @@ with tabs[1]:
     fe = Q("""
         SELECT
             CASE
-                WHEN DATE_PART('year',AGE(c.data_nascimento)) < 18          THEN 'Menor 18'
+                WHEN DATE_PART('year',AGE(c.data_nascimento)) < 18              THEN 'Menor 18'
                 WHEN DATE_PART('year',AGE(c.data_nascimento)) BETWEEN 18 AND 25 THEN '18-25'
                 WHEN DATE_PART('year',AGE(c.data_nascimento)) BETWEEN 26 AND 35 THEN '26-35'
                 WHEN DATE_PART('year',AGE(c.data_nascimento)) BETWEEN 36 AND 45 THEN '36-45'
                 WHEN DATE_PART('year',AGE(c.data_nascimento)) BETWEEN 46 AND 60 THEN '46-60'
                 ELSE '+60'
             END AS faixa,
-            COUNT(DISTINCT c.id_cliente)            AS clientes,
-            COUNT(p.id)                             AS pedidos,
-            ROUND(AVG(p.valor_total)::numeric,2)    AS ticket,
-            ROUND(SUM(p.valor_total)::numeric,2)    AS faturamento
+            COUNT(DISTINCT c.id_cliente)         AS clientes,
+            COUNT(p.id)                          AS pedidos,
+            ROUND(AVG(p.valor_total)::numeric,2) AS ticket,
+            ROUND(SUM(p.valor_total)::numeric,2) AS faturamento
         FROM clientes c
         JOIN pedido p ON p.id_cliente = c.id_cliente
         WHERE c.data_nascimento IS NOT NULL
@@ -213,12 +203,11 @@ with tabs[1]:
         ORDER BY MIN(DATE_PART('year',AGE(c.data_nascimento)))
     """)
 
-    imc = fe.clientes.idxmax(); imt = fe.ticket.idxmax()
+    imc = fe.clientes.idxmax()
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Faixas Mapeadas",  str(len(fe)), fe.clientes, PURPLE)
-    kpi(c2, "Total Clientes",
-        f"{int(fe.clientes.sum()):,}".replace(",","."), fe.faturamento, CYAN)
-    kpi(c3, "Faixa Dominante",  fe.loc[imc,'faixa'], fe.clientes, GREEN,
+    kpi(c1, "Faixas Mapeadas", str(len(fe)), fe.clientes, PURPLE)
+    kpi(c2, "Total Clientes",  f"{int(fe.clientes.sum()):,}".replace(",","."), fe.faturamento, CYAN)
+    kpi(c3, "Faixa Dominante", fe.loc[imc,'faixa'], fe.clientes, GREEN,
         f"{int(fe.clientes.max()):,}".replace(",",".")+" clientes")
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
     st.markdown("---")
@@ -228,25 +217,20 @@ with tabs[1]:
         st.markdown("### Ticket Médio por Faixa")
         fg = go.Figure(go.Bar(
             x=fe.faixa, y=fe.ticket,
-            marker=dict(color=fe.ticket, colorscale=HEAT_GREEN,
-                        showscale=False, line=dict(width=0)),
+            marker=dict(color=fe.ticket, colorscale=HEAT_GREEN, showscale=False, line=dict(width=0)),
             text=fe.ticket.apply(lambda v: f"R${v:,.0f}".replace(",",".")),
             textposition='outside', textfont=dict(size=10)))
         fg.update_layout(**PL, height=340)
-        fg.update_xaxes(tickfont=dict(size=11))
-        fg.update_yaxes(visible=False)
+        fg.update_xaxes(tickfont=dict(size=11)); fg.update_yaxes(visible=False)
         st.plotly_chart(fg, use_container_width=True)
     with cb:
         st.markdown("### Faturamento por Faixa")
         fg2 = go.Figure(go.Bar(
             x=fe.faixa, y=fe.faturamento,
-            marker=dict(color=fe.faturamento, colorscale=HEAT,
-                        showscale=False, line=dict(width=0)),
-            text=fe.faturamento.apply(brls),
-            textposition='outside', textfont=dict(size=10)))
+            marker=dict(color=fe.faturamento, colorscale=HEAT, showscale=False, line=dict(width=0)),
+            text=fe.faturamento.apply(brls), textposition='outside', textfont=dict(size=10)))
         fg2.update_layout(**PL, height=340)
-        fg2.update_xaxes(tickfont=dict(size=11))
-        fg2.update_yaxes(visible=False)
+        fg2.update_xaxes(tickfont=dict(size=11)); fg2.update_yaxes(visible=False)
         st.plotly_chart(fg2, use_container_width=True)
     with cc:
         st.markdown("### Distribuição")
@@ -254,13 +238,13 @@ with tabs[1]:
             labels=fe.faixa, values=fe.clientes, hole=0.6,
             marker=dict(colors=SEQ[:len(fe)], line=dict(width=0)),
             textinfo='percent', textfont=dict(size=10)))
-        fg3.update_layout(**PL, height=340, showlegend=True,
-            legend=dict(orientation='v', x=1, y=0.5, font=dict(size=9)))
+        fg3.update_layout(**PL, height=340, showlegend=True)
+        fg3.update_layout(legend=dict(bgcolor="rgba(0,0,0,0)", orientation='v',
+                                      x=1, y=0.5, font=dict(size=9)))
         st.plotly_chart(fg3, use_container_width=True)
 
     st.markdown("---")
-    st.dataframe(fe.rename(columns={
-        'faixa':'Faixa','clientes':'Clientes','pedidos':'Pedidos',
+    st.dataframe(fe.rename(columns={'faixa':'Faixa','clientes':'Clientes','pedidos':'Pedidos',
         'ticket':'Ticket Médio (R$)','faturamento':'Faturamento (R$)'}),
         use_container_width=True, hide_index=True)
 
@@ -300,11 +284,10 @@ with tabs[2]:
              .sort_values('fat', ascending=False))
 
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Vendedores",      str(vd.vendedor.nunique()), res.fat, PURPLE)
+    kpi(c1, "Vendedores",       str(vd.vendedor.nunique()), res.fat, PURPLE)
     kpi(c2, "Faturamento Total", brl(vd.faturamento.sum()), res.fat, CYAN)
     if len(res) > 0:
-        kpi(c3, "Top Vendedor", res.index[0][:22], res.fat, GREEN,
-            brl(res.fat.iloc[0]))
+        kpi(c3, "Top Vendedor", res.index[0][:22], res.fat, GREEN, brl(res.fat.iloc[0]))
     else:
         kpi(c3, "Top Vendedor", "—", None, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
@@ -313,26 +296,22 @@ with tabs[2]:
     ca, cb = st.columns([3, 2])
     with ca:
         st.markdown("### 🗺️ Heatmap — Faturamento por Vendedor × Estado")
-        pivot = vd.pivot_table(
-            values='faturamento', index='vendedor', columns='estado',
-            aggfunc='sum', fill_value=0)
+        pivot = vd.pivot_table(values='faturamento', index='vendedor',
+                               columns='estado', aggfunc='sum', fill_value=0)
         pivot['_t'] = pivot.sum(axis=1)
-        pivot = (pivot.sort_values('_t', ascending=False)
-                      .drop(columns='_t').head(20))
+        pivot = pivot.sort_values('_t', ascending=False).drop(columns='_t').head(20)
         z_text = pivot.map(lambda v: brls(v) if v > 0 else "")
         fh = px.imshow(pivot, color_continuous_scale=HEAT, aspect='auto', zmin=0)
-        fh.update_traces(
-            text=z_text.values, texttemplate="%{text}",
-            textfont=dict(size=9),
-            hovertemplate='%{y} × %{x}<br>R$ %{z:,.0f}<extra></extra>')
+        fh.update_traces(text=z_text.values, texttemplate="%{text}",
+                         textfont=dict(size=9),
+                         hovertemplate='%{y} × %{x}<br>R$ %{z:,.0f}<extra></extra>')
         fh.update_layout(**PL, height=520, coloraxis_showscale=False)
         fh.update_xaxes(tickfont=dict(size=11), side='top')
         fh.update_yaxes(tickfont=dict(size=9))
         st.plotly_chart(fh, use_container_width=True)
     with cb:
         st.markdown("### Ranking de Vendedores")
-        st.dataframe(res.rename(columns={
-            'fat':'Faturamento (R$)','ped':'Pedidos',
+        st.dataframe(res.rename(columns={'fat':'Faturamento (R$)','ped':'Pedidos',
             'cli':'Clientes','ticket':'Ticket Médio'}),
             height=520, use_container_width=True)
 
@@ -342,13 +321,13 @@ with tabs[2]:
 with tabs[3]:
     br = Q("""
         SELECT pr.nome_produto AS produto,
-            SUM(pi.quantidade)                      AS qtd,
-            COUNT(DISTINCT p.id)                    AS pedidos,
+            SUM(pi.quantidade)                       AS qtd,
+            COUNT(DISTINCT p.id)                     AS pedidos,
             ROUND(AVG(pi.valor_unitario)::numeric,2) AS preco,
-            ROUND(SUM(pi.valor_total)::numeric,2)   AS valor_total
+            ROUND(SUM(pi.valor_total)::numeric,2)    AS valor_total
         FROM pedido p
-        JOIN pedido_itens pi ON pi.id_pedido   = p.id
-        JOIN produto      pr ON pr.id_produto  = pi.id_produto
+        JOIN pedido_itens pi ON pi.id_pedido  = p.id
+        JOIN produto      pr ON pr.id_produto = pi.id_produto
         WHERE p.tipo_pedido = 'BRINDE'
           AND p.cancelado_em IS NULL AND p.status != 'CANCELADO'
         GROUP BY pr.nome_produto
@@ -356,10 +335,9 @@ with tabs[3]:
     """)
 
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Produtos Distintos", str(len(br)), br.qtd, AMBER)
-    kpi(c2, "Unidades Doadas",
-        f"{int(br.qtd.sum()):,}".replace(",","."), br.qtd, RED)
-    kpi(c3, "Valor Total", brl(br.valor_total.sum()), br.valor_total, PURPLE)
+    kpi(c1, "Produtos Distintos", str(len(br)),                           br.qtd,        AMBER)
+    kpi(c2, "Unidades Doadas",    f"{int(br.qtd.sum()):,}".replace(",","."), br.qtd,     RED)
+    kpi(c3, "Valor Total",        brl(br.valor_total.sum()),              br.valor_total, PURPLE)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
     st.markdown("---")
 
@@ -379,8 +357,7 @@ with tabs[3]:
         st.plotly_chart(fbar, use_container_width=True)
     with cb:
         st.markdown("### Lista Completa")
-        st.dataframe(br.rename(columns={
-            'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
+        st.dataframe(br.rename(columns={'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
             'preco':'Preço Médio (R$)','valor_total':'Valor Total (R$)'}),
             height=490, use_container_width=True, hide_index=True)
 
@@ -390,13 +367,13 @@ with tabs[3]:
 with tabs[4]:
     pv = Q("""
         SELECT pr.nome_produto AS produto,
-            SUM(pi.quantidade)                      AS qtd,
-            COUNT(DISTINCT p.id)                    AS pedidos,
+            SUM(pi.quantidade)                       AS qtd,
+            COUNT(DISTINCT p.id)                     AS pedidos,
             ROUND(AVG(pi.valor_unitario)::numeric,2) AS preco,
-            ROUND(SUM(pi.valor_total)::numeric,2)   AS faturamento
+            ROUND(SUM(pi.valor_total)::numeric,2)    AS faturamento
         FROM pedido p
-        JOIN pedido_itens pi ON pi.id_pedido   = p.id
-        JOIN produto      pr ON pr.id_produto  = pi.id_produto
+        JOIN pedido_itens pi ON pi.id_pedido  = p.id
+        JOIN produto      pr ON pr.id_produto = pi.id_produto
         WHERE p.tipo_pedido = 'PRE-VENDA'
           AND p.cancelado_em IS NULL AND p.status != 'CANCELADO'
         GROUP BY pr.nome_produto
@@ -404,10 +381,9 @@ with tabs[4]:
     """)
 
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Produtos Distintos", str(len(pv)), pv.qtd, PURPLE)
-    kpi(c2, "Unidades Vendidas",
-        f"{int(pv.qtd.sum()):,}".replace(",","."), pv.faturamento, CYAN)
-    kpi(c3, "Faturamento Total", brl(pv.faturamento.sum()), pv.faturamento, GREEN)
+    kpi(c1, "Produtos Distintos", str(len(pv)),                              pv.qtd,       PURPLE)
+    kpi(c2, "Unidades Vendidas",  f"{int(pv.qtd.sum()):,}".replace(",","."), pv.faturamento, CYAN)
+    kpi(c3, "Faturamento Total",  brl(pv.faturamento.sum()),                 pv.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
     busca = st.text_input("🔍 Buscar produto", "", key="busca_pv",
@@ -431,7 +407,6 @@ with tabs[4]:
         st.plotly_chart(fpv, use_container_width=True)
     with cb:
         st.markdown("### Ranking Completo")
-        st.dataframe(dff.rename(columns={
-            'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
+        st.dataframe(dff.rename(columns={'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
             'preco':'Preço Médio (R$)','faturamento':'Faturamento (R$)'}),
             height=490, use_container_width=True, hide_index=True)
