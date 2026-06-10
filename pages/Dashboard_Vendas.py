@@ -5,9 +5,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 
-st.set_page_config(page_title="Dashboard de Vendas", page_icon="ð", layout="wide")
+st.set_page_config(page_title="Dashboard de Vendas", page_icon="📊", layout="wide")
 
-# ââ CSS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""<style>
 .block-container{padding-top:.7rem;padding-bottom:.5rem;max-width:100%}
 .kpi-card{
@@ -33,7 +33,7 @@ h3{font-size:.8rem!important;text-transform:uppercase;letter-spacing:.09em;
 hr{border-color:rgba(123,97,255,.15)!important;margin:.6rem 0!important}
 </style>""", unsafe_allow_html=True)
 
-# ââ CONSTANTES ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ── CONSTANTES ────────────────────────────────────────────────────────────────
 PURPLE = "#7B61FF"; CYAN = "#00D4FF"; GREEN = "#00FF94"
 AMBER  = "#FFB800"; RED  = "#FF6B6B"
 SEQ    = [PURPLE,"#5B8EFF",CYAN,"#00FFB8",GREEN,"#B0FF66",AMBER,RED]
@@ -46,7 +46,7 @@ PL = dict(
     margin=dict(l=0,r=4,t=30,b=0),
 )
 
-# ââ DB ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ── DB ────────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_conn():
     return psycopg2.connect(
@@ -58,13 +58,13 @@ def get_conn():
 def Q(sql):
     return pd.read_sql(sql, get_conn())
 
-# ââ HELPERS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ── HELPERS ───────────────────────────────────────────────────────────────────
 def brl(v):  return f"R$ {v:,.0f}".replace(",",".")
 def brls(v): return f"R${v/1000:.0f}k" if v>=1000 else f"R${v:.0f}"
 def badge(v, p25, p75):
-    if v >= p75: return "ð¢ Alto"
-    if v >= p25: return "ð¡ MÃ©dio"
-    return "ð´ Baixo"
+    if v >= p75: return "🟢 Alto"
+    if v >= p25: return "🟡 Médio"
+    return "🔴 Baixo"
 
 def _sparksvg(series, color, w=80, h=28):
     pts = [float(x) for x in list(series) if pd.notna(x)][-20:]
@@ -91,20 +91,20 @@ def kpi(col, label, value, series=None, color=CYAN, sub=None):
             f'<div>{spark}</div></div>',
             unsafe_allow_html=True)
 
-# ââ HEADER ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ── HEADER ────────────────────────────────────────────────────────────────────
 st.markdown(
-    f'## ð Dashboard de Vendas â SGV&nbsp;&nbsp;'
+    f'## 📊 Dashboard de Vendas — SGV&nbsp;&nbsp;'
     f'<span style="font-size:.75rem;color:#8B92A5;font-weight:400">'
     f'Atualizado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
-    f' Â· PRE-VENDA vÃ¡lidos Â· cache 10 min</span>',
+    f' · PRE-VENDA válidos · cache 10 min</span>',
     unsafe_allow_html=True)
 
-tabs = st.tabs(["ð£ï¸ Rotas","ð¥ Faixa EtÃ¡ria",
-                "ð§âð¼ Vendedor Ã Estado","ð Produtos BRINDE","ð Produtos PRE-VENDA"])
+tabs = st.tabs(["🛣️ Rotas","👥 Faixa Etária",
+                "🧑‍💼 Vendedor × Estado","🎁 Produtos BRINDE","🛒 Produtos PRE-VENDA"])
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-# TAB 1 â ROTAS
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 1 – ROTAS
+# ════════════════════════════════════════════════════════════════════════════
 with tabs[0]:
     rotas = Q("""
         SELECT r.nome_rota AS rota,
@@ -138,12 +138,12 @@ with tabs[0]:
         trend.pedidos, PURPLE)
     kpi(c2, "Faturamento Total",   brl(rotas.fat_total.sum()),
         trend.faturamento, CYAN)
-    kpi(c3, "Ticket MÃ©dio Geral",  brl(rotas.ticket.mean()),
+    kpi(c3, "Ticket Médio Geral",  brl(rotas.ticket.mean()),
         trend.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
     # Trend sparkline
-    st.markdown("### ð TendÃªncia Semanal â Faturamento PRE-VENDA")
+    st.markdown("### 📈 Tendência Semanal — Faturamento PRE-VENDA")
     ft = go.Figure(go.Scatter(
         x=trend.semana, y=trend.faturamento, mode='lines+markers',
         line=dict(color=CYAN, width=2.5), marker=dict(size=5, color=PURPLE),
@@ -161,7 +161,7 @@ with tabs[0]:
     p25 = rotas.fat_sem.quantile(.25); p75 = rotas.fat_sem.quantile(.75)
     ca, cb = st.columns([5, 6])
     with ca:
-        st.markdown("### Top 20 Rotas â MÃ©dia Semanal (R$)")
+        st.markdown("### Top 20 Rotas — Média Semanal (R$)")
         d20 = rotas.head(20)
         fb = go.Figure(go.Bar(
             x=d20.fat_sem, y=d20.rota, orientation='h',
@@ -174,7 +174,7 @@ with tabs[0]:
         fb.update_xaxes(visible=False)
         st.plotly_chart(fb, use_container_width=True)
     with cb:
-        st.markdown("### VisÃ£o Detalhada por Rota")
+        st.markdown("### Visão Detalhada por Rota")
         rt = rotas.copy()
         rt['Status'] = rt.fat_sem.apply(lambda v: badge(v, p25, p75))
         rt['fat_sem'] = rt['fat_sem'].apply(brl)
@@ -183,12 +183,12 @@ with tabs[0]:
         st.dataframe(
             rt[['rota','ped_sem','fat_sem','ticket','Status']].rename(columns={
                 'rota':'Rota','ped_sem':'Ped/Sem',
-                'fat_sem':'Fat/Sem (R$)','ticket':'Ticket MÃ©dio','Status':'Status'}),
+                'fat_sem':'Fat/Sem (R$)','ticket':'Ticket Médio','Status':'Status'}),
             height=560, use_container_width=True)
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-# TAB 2 â FAIXA ETÃRIA
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 2 – FAIXA ETÁRIA
+# ════════════════════════════════════════════════════════════════════════════
 with tabs[1]:
     fe = Q("""
         SELECT
@@ -226,7 +226,7 @@ with tabs[1]:
 
     ca, cb, cc = st.columns([4, 4, 3])
     with ca:
-        st.markdown("### Ticket MÃ©dio por Faixa")
+        st.markdown("### Ticket Médio por Faixa")
         fg = go.Figure(go.Bar(
             x=fe.faixa, y=fe.ticket,
             marker=dict(color=fe.ticket, colorscale=HEAT_GREEN,
@@ -250,7 +250,7 @@ with tabs[1]:
         fg2.update_yaxes(visible=False)
         st.plotly_chart(fg2, use_container_width=True)
     with cc:
-        st.markdown("### DistribuiÃ§Ã£o")
+        st.markdown("### Distribuição")
         fg3 = go.Figure(go.Pie(
             labels=fe.faixa, values=fe.clientes, hole=0.6,
             marker=dict(colors=SEQ[:len(fe)], line=dict(width=0)),
@@ -266,12 +266,12 @@ with tabs[1]:
     fe_disp['faturamento']= fe_disp['faturamento'].apply(brl)
     st.dataframe(fe_disp.rename(columns={
         'faixa':'Faixa','clientes':'Clientes','pedidos':'Pedidos',
-        'ticket':'Ticket MÃ©dio','faturamento':'Faturamento'}),
+        'ticket':'Ticket Médio','faturamento':'Faturamento'}),
         use_container_width=True, hide_index=True)
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-# TAB 3 â VENDEDOR Ã ESTADO
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 3 – VENDEDOR × ESTADO
+# ════════════════════════════════════════════════════════════════════════════
 with tabs[2]:
     vd = Q("""
         SELECT v.nome_vendedor AS vendedor,
@@ -311,13 +311,13 @@ with tabs[2]:
         kpi(c3, "Top Vendedor", res.index[0][:22], res.fat, GREEN,
             brl(res.fat.iloc[0]))
     else:
-        kpi(c3, "Top Vendedor", "â", None, GREEN)
+        kpi(c3, "Top Vendedor", "—", None, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
     st.markdown("---")
 
     ca, cb = st.columns([3, 2])
     with ca:
-        st.markdown("### ðºï¸ Heatmap â Faturamento por Vendedor Ã Estado")
+        st.markdown("### 🗺️ Heatmap — Faturamento por Vendedor × Estado")
         pivot = vd.pivot_table(
             values='faturamento', index='vendedor', columns='estado',
             aggfunc='sum', fill_value=0)
@@ -329,7 +329,7 @@ with tabs[2]:
         fh.update_traces(
             text=z_text.values, texttemplate="%{text}",
             textfont=dict(size=9),
-            hovertemplate='%{y} Ã %{x}<br>R$ %{z:,.0f}<extra></extra>')
+            hovertemplate='%{y} × %{x}<br>R$ %{z:,.0f}<extra></extra>')
         fh.update_layout(**PL, height=520, coloraxis_showscale=False)
         fh.update_xaxes(tickfont=dict(size=11), side='top')
         fh.update_yaxes(tickfont=dict(size=9))
@@ -341,12 +341,12 @@ with tabs[2]:
         res_disp['ticket'] = res_disp['ticket'].apply(brl)
         st.dataframe(res_disp.rename(columns={
             'fat':'Faturamento','ped':'Pedidos',
-            'cli':'Clientes','ticket':'Ticket MÃ©dio'}),
+            'cli':'Clientes','ticket':'Ticket Médio'}),
             height=520, use_container_width=True)
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-# TAB 4 â BRINDES
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 4 – BRINDES
+# ════════════════════════════════════════════════════════════════════════════
 with tabs[3]:
     br = Q("""
         SELECT pr.nome_produto AS produto,
@@ -392,12 +392,12 @@ with tabs[3]:
         br_disp['valor_total'] = br_disp['valor_total'].apply(brl)
         st.dataframe(br_disp.rename(columns={
             'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
-            'preco':'PreÃ§o MÃ©dio','valor_total':'Valor Total'}),
+            'preco':'Preço Médio','valor_total':'Valor Total'}),
             height=490, use_container_width=True, hide_index=True)
 
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-# TAB 5 â PRE-VENDA
-# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 5 – PRE-VENDA
+# ════════════════════════════════════════════════════════════════════════════
 with tabs[4]:
     pv = Q("""
         SELECT pr.nome_produto AS produto,
@@ -421,14 +421,14 @@ with tabs[4]:
     kpi(c3, "Faturamento Total", brl(pv.faturamento.sum()), pv.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
-    busca = st.text_input("ð Buscar produto", "", key="busca_pv",
+    busca = st.text_input("🔍 Buscar produto", "", key="busca_pv",
                           placeholder="Digite parte do nome...")
     dff = pv[pv.produto.str.contains(busca, case=False, na=False)] if busca else pv
     st.markdown("---")
 
     ca, cb = st.columns([3, 4])
     with ca:
-        st.markdown("### Top 15 Produtos â Faturamento")
+        st.markdown("### Top 15 Produtos — Faturamento")
         d15 = dff.head(15)
         fpv = go.Figure(go.Bar(
             x=d15.faturamento, y=d15.produto, orientation='h',
@@ -447,5 +447,6 @@ with tabs[4]:
         dff_disp['faturamento'] = dff_disp['faturamento'].apply(brl)
         st.dataframe(dff_disp.rename(columns={
             'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
-            'preco':'PreÃ§o MÃ©dio','faturamento':'Faturamento'}),
+            'preco':'Preço Médio','faturamento':'Faturamento'}),
             height=490, use_container_width=True, hide_index=True)
+# encoding: utf-8
