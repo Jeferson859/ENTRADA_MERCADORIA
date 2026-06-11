@@ -13,7 +13,10 @@ from db import (
     load_produtos_por_tipo,
     load_pedidos_sem_rota,
     load_divergencia_pedido_itens,
+    load_giro_estoque,
 )
+
+LEAD_TIME_DIAS = 15  # prazo médio de reposição
 
 st.set_page_config(page_title="Dashboard de Vendas", page_icon="📊", layout="wide")
 
@@ -115,6 +118,10 @@ def fetch_sem_rota(di, df):
 def fetch_divergencias(di, df):
     return load_divergencia_pedido_itens(data_ini=di, data_fim=df)
 
+@st.cache_data(ttl=600, show_spinner="Calculando giro de estoque...")
+def fetch_giro(dias):
+    return load_giro_estoque(dias)
+
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def brl(v): return f"R$ {v:,.0f}".replace(",",".")
 def brls(v): return f"R${v/1000:.0f}k" if v>=1000 else f"R${v:.0f}"
@@ -169,7 +176,8 @@ st.markdown(
     unsafe_allow_html=True)
 
 tabs = st.tabs(["🛣️ Rotas","👥 Faixa Etária",
-                "🧑‍💼 Vendedor × Estado","🎁 Produtos BRINDE","🛒 Produtos PRE-VENDA"])
+                "🧑‍💼 Vendedor × Estado","🎁 Produtos BRINDE","🛒 Produtos PRE-VENDA",
+                "📦 Giro de Estoque"])
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 1 – ROTAS
@@ -538,3 +546,103 @@ with tabs[4]:
                 'faturamento': col_progresso('Faturamento', pv.faturamento.max()),
             },
             height=490, use_container_width=True, hide_index=True)
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 6 – GIRO DE ESTOQUE
+# ════════════════════════════════════════════════════════════════════════════
+with tabs[5]:
+    fc1, fc2, fc3 = st.columns([2, 2, 3])
+    with fc1:
+        janela = st.radio("Janela de saída", [30, 60, 90], horizontal=True,
+                          format_func=lambda d: f"{d} dias", key="giro_janela")
+    with fc2:
+        lead = st.slider("Prazo de reposição (dias)", 5, 45, LEAD_TIME_DIAS, 5,
+                         key="giro_lead")
+    with fc3:
+        busca_g = st.text_input("🔍 Buscar produto", "", key="busca_giro",
+                                placeholder="Digite parte do nome...")
+
+    ge = fetch_giro(janela)
+
+    def status_giro(r):
+        if r.saida_periodo > 0 and r.estoque <= 0:
+            return "🔴 Sem estoque"
+        if r.saida_periodo == 0:
+            return "🟡 Parado"
+        if r.cobertura_dias is not None and r.cobertura_dias <= lead:
+            return "🔴 Risco ruptura"
+        if r.cobertura_dias is not None and r.cobertura_dias > 90:
+            return "🟠 Excesso"
+        return "🟢 Saudável"
+
+    ge = ge.copy()
+    ge['status'] = ge.apply(status_giro, axis=1)
+
+    em_risco = (ge.status.isin(["🔴 Risco ruptura", "🔴 Sem estoque"])).sum()
+    parados = (ge.status == "🟡 Parado").sum()
+    excesso = (ge.status == "🟠 Excesso").sum()
+    com_venda = ge[ge.saida_periodo > 0]
+    cobertura_mediana = com_venda.cobertura_dias.median() if len(com_venda) else 0
+    giro_geral = (com_venda.saida_periodo.sum() / com_venda.estoque.sum()) \
+                 if com_venda.estoque.sum() > 0 else 0
+
+    c1, c2, c3, c4 = st.columns(4)
+    kpi(c1, "Risco de Ruptura", str(em_risco), None, RED,
+        f"cobertura ≤ {lead} dias")
+    kpi(c2, "Produtos Parados", str(parados), None, AMBER,
+        f"sem saída em {janela} dias")
+    kpi(c3, "Cobertura Mediana", f"{cobertura_mediana:.0f} dias",
+        None, CYAN, "produtos com venda")
+    kpi(c4, "Giro Geral", f"{giro_geral:.2f}x", None, GREEN,
+        f"saída ÷ estoque em {janela} dias")
+    st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    gef = ge[ge.produto.str.contains(busca_g, case=False, na=False)] if busca_g else ge
+
+    ca, cb = st.columns([2, 3])
+    with ca:
+        st.markdown(f"### ⏳ Menores Coberturas (≤ {lead*2} dias)")
+        crit = gef[(gef.saida_periodo > 0) & (gef.cobertura_dias <= lead * 2)] \
+                .nsmallest(15, 'cobertura_dias')
+        if len(crit):
+            fgi = go.Figure(go.Bar(
+                x=crit.cobertura_dias, y=crit.produto, orientation='h',
+                marker=dict(color=crit.cobertura_dias,
+                            colorscale=[[0, RED], [.6, AMBER], [1, '#30363D']],
+                            showscale=False, line=dict(width=0)),
+                text=crit.cobertura_dias.apply(lambda v: f"{v:.0f}d"),
+                textposition='outside',
+                textfont=dict(size=9, color='#8B92A5')))
+            fgi.add_vline(x=lead, line_dash="dash", line_color=RED,
+                          annotation_text=f"reposição ({lead}d)",
+                          annotation_font_size=9)
+            fgi.update_traces(cliponaxis=False)
+            fgi.update_layout(**PL, height=max(360, 30*len(crit)))
+            fgi.update_layout(margin=dict(l=0, r=40, t=30, b=0))
+            fgi.update_yaxes(autorange='reversed', tickfont=dict(size=9))
+            fgi.update_xaxes(tickfont=dict(size=9),
+                             gridcolor='rgba(255,255,255,.05)')
+            st.plotly_chart(fgi, use_container_width=True)
+        else:
+            st.info("Nenhum produto com cobertura crítica. 👍")
+    with cb:
+        st.markdown("### Visão Completa por Produto")
+        st.dataframe(
+            gef[['produto','estoque','saida_periodo','media_dia',
+                 'giro','cobertura_dias','status']],
+            column_config={
+                'produto': st.column_config.TextColumn('Produto'),
+                'estoque': st.column_config.NumberColumn('Estoque', format="%d"),
+                'saida_periodo': st.column_config.NumberColumn(f'Saída {janela}d', format="%d"),
+                'media_dia': st.column_config.NumberColumn('Média/Dia', format="%.2f"),
+                'giro': st.column_config.NumberColumn('Giro', format="%.2fx"),
+                'cobertura_dias': st.column_config.NumberColumn('Cobertura (dias)', format="%.0f"),
+                'status': st.column_config.TextColumn('Status'),
+            },
+            height=520, use_container_width=True, hide_index=True)
+    st.caption(
+        f"Saídas = unidades de itens ativos em pedidos PRE-VENDA, BRINDE e REPOSICAO "
+        f"dos últimos {janela} dias · Estoque = saldo disponível atual · "
+        f"Cobertura = estoque ÷ média diária de saída · "
+        f"Giro = saída do período ÷ estoque atual")
