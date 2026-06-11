@@ -11,6 +11,7 @@ from db import (
     load_vendas_faixa_etaria,
     load_vendas_vendedor_estado,
     load_produtos_por_tipo,
+    load_pedidos_sem_rota,
 )
 
 st.set_page_config(page_title="Dashboard de Vendas", page_icon="📊", layout="wide")
@@ -105,6 +106,10 @@ def fetch_vendedor_estado(di, df):
 def fetch_produtos(tipo, di, df):
     return load_produtos_por_tipo(tipo, data_ini=di, data_fim=df)
 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_sem_rota(di, df):
+    return load_pedidos_sem_rota(data_ini=di, data_fim=df)
+
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def brl(v): return f"R$ {v:,.0f}".replace(",",".")
 def brls(v): return f"R${v/1000:.0f}k" if v>=1000 else f"R${v:.0f}"
@@ -189,6 +194,26 @@ with tabs[0]:
     kpi(c3, "Ticket Médio Geral", brl(ticket_geral) if len(rotas_f) else "—",
         trend.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
+
+    # Pedidos PRE-VENDA sem rota — ficam fora dos totais desta aba
+    sem_rota = fetch_sem_rota(f_ini, f_fim)
+    if len(sem_rota):
+        with st.expander(
+            f"⚠️ {len(sem_rota)} pedido(s) PRE-VENDA sem rota vinculada — "
+            f"{brl(sem_rota.valor_total.sum())} fora do faturamento desta aba"
+        ):
+            st.dataframe(
+                sem_rota,
+                column_config={
+                    'id': st.column_config.NumberColumn('Pedido', format="%d"),
+                    'data': st.column_config.DatetimeColumn('Data', format="DD/MM/YYYY HH:mm"),
+                    'id_cliente': st.column_config.NumberColumn('Cliente', format="%d"),
+                    'vendedor': st.column_config.TextColumn('Vendedor'),
+                    'status': st.column_config.TextColumn('Status'),
+                    'valor_total': col_moeda('Valor'),
+                    'obs': st.column_config.TextColumn('Obs'),
+                },
+                use_container_width=True, hide_index=True)
 
     # Trend sparkline
     st.markdown("### 📈 Tendência Semanal — Faturamento PRE-VENDA")
