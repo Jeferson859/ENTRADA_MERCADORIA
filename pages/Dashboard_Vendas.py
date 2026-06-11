@@ -185,7 +185,8 @@ with tabs[0]:
         trend.pedidos, PURPLE)
     kpi(c2, "Faturamento Total", brl(rotas_f.fat_total.sum()),
         trend.faturamento, CYAN)
-    kpi(c3, "Ticket Médio Geral", brl(rotas_f.ticket.mean()) if len(rotas_f) else "—",
+    ticket_geral = (rotas_f.fat_total.sum() / rotas_f.pedidos.sum()) if rotas_f.pedidos.sum() else 0
+    kpi(c3, "Ticket Médio Geral", brl(ticket_geral) if len(rotas_f) else "—",
         trend.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
@@ -197,7 +198,7 @@ with tabs[0]:
         fill='tozeroy', fillcolor='rgba(123,97,255,.08)',
         hovertemplate='%{x|%d/%m/%y}<br>R$ %{y:,.0f}<extra></extra>'))
     ft.update_layout(**PL, height=160, showlegend=False)
-    ft.update_xaxes(tickformat='%b/%y', tickfont=dict(size=9),
+    ft.update_xaxes(tickformat='%d/%m', tickfont=dict(size=9),
                     gridcolor='rgba(255,255,255,.05)')
     ft.update_yaxes(tickformat=',.0f', tickfont=dict(size=9),
                     gridcolor='rgba(255,255,255,.05)')
@@ -323,8 +324,9 @@ with tabs[2]:
 
     res = (vd_f.groupby('vendedor')
              .agg(fat=('faturamento','sum'), ped=('pedidos','sum'),
-                  cli=('clientes','sum'), ticket=('ticket','mean'))
+                  cli=('clientes','sum'))
              .sort_values('fat', ascending=False))
+    res['ticket'] = res.fat / res.ped.replace(0, pd.NA)  # ticket ponderado: faturamento ÷ pedidos
 
     c1, c2, c3 = st.columns(3)
     kpi(c1, "Vendedores", str(vd_f.vendedor.nunique()), res.fat, PURPLE)
