@@ -1,4 +1,5 @@
 import os
+from datetime import date, datetime, timedelta
 from urllib.parse import quote_plus
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -49,14 +50,22 @@ def _query(sql: str, params: dict = None) -> pd.DataFrame:
         return pd.read_sql(text(sql), conn, params=params or {})
 
 
-def _clausula_periodo(clauses: list, params: dict, data_ini, data_fim):
-    """Adiciona filtro de período (p.data) às cláusulas, se informado."""
+def _clausula_periodo(clauses: list, params: dict, data_ini, data_fim, col: str = "p.data"):
+    """Adiciona filtro de período às cláusulas, se informado.
+
+    data_fim é INCLUSIVO: como a coluna pode ter hora, usa < (data_fim + 1 dia)
+    para incluir todas as vendas do próprio dia final.
+    """
     if data_ini:
-        clauses.append("p.data >= :data_ini")
+        clauses.append(f"{col} >= :data_ini")
         params["data_ini"] = data_ini
     if data_fim:
-        clauses.append("p.data <= :data_fim")
-        params["data_fim"] = data_fim
+        if isinstance(data_fim, (date, datetime)):
+            clauses.append(f"{col} < :data_fim")
+            params["data_fim"] = data_fim + timedelta(days=1)
+        else:
+            clauses.append(f"{col} <= :data_fim")
+            params["data_fim"] = data_fim
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -185,13 +194,8 @@ def buscar_ids_por_produto(termo: str) -> list[int]:
 def load_contagens(data_ini=None, data_fim=None, status=None) -> pd.DataFrame:
     clauses = ["1=1"]
     params = {}
+    _clausula_periodo(clauses, params, data_ini, data_fim, col="c.data")
 
-    if data_ini:
-        clauses.append("c.data >= :data_ini")
-        params["data_ini"] = data_ini
-    if data_fim:
-        clauses.append("c.data <= :data_fim")
-        params["data_fim"] = data_fim
     if status:
         clauses.append("c.status = :status")
         params["status"] = status
@@ -399,7 +403,7 @@ def load_produtos_por_tipo(tipo_pedido: str = "PRE-VENDA", data_ini=None, data_f
         SELECT pr.nome_produto AS produto,
                SUM(pi.quantidade) AS qtd,
                COUNT(DISTINCT p.id) AS pedidos,
-               ROUND(AVG(pi.valor_unitario)::numeric, 2) AS preco,
+               ROUND((SUM(pi.valor_total) / NULLIF(SUM(pi.quantidade), 0))::numeric, 2) AS preco,
                ROUND(SUM(pi.valor_total)::numeric, 2) AS faturamento
         FROM pedido p
         JOIN pedido_itens pi ON pi.id_pedido = p.id
