@@ -12,6 +12,7 @@ from db import (
     load_vendas_vendedor_estado,
     load_produtos_por_tipo,
     load_pedidos_sem_rota,
+    load_divergencia_pedido_itens,
 )
 
 st.set_page_config(page_title="Dashboard de Vendas", page_icon="📊", layout="wide")
@@ -109,6 +110,10 @@ def fetch_produtos(tipo, di, df):
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_sem_rota(di, df):
     return load_pedidos_sem_rota(data_ini=di, data_fim=df)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_divergencias(di, df):
+    return load_divergencia_pedido_itens(data_ini=di, data_fim=df)
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def brl(v): return f"R$ {v:,.0f}".replace(",",".")
@@ -212,6 +217,29 @@ with tabs[0]:
                     'status': st.column_config.TextColumn('Status'),
                     'valor_total': col_moeda('Valor'),
                     'obs': st.column_config.TextColumn('Obs'),
+                },
+                use_container_width=True, hide_index=True)
+
+    # Pedidos onde o valor do cabeçalho difere da soma dos itens
+    div = fetch_divergencias(f_ini, f_fim)
+    if len(div):
+        with st.expander(
+            f"🔎 {len(div)} pedido(s) com valor do pedido ≠ soma dos itens — "
+            f"diferença líquida de {brl(div.diferenca.sum())} entre as abas Rotas e Produtos"
+        ):
+            st.caption(
+                "A aba **Rotas** soma o `valor_total` do pedido (cabeçalho); a aba "
+                "**Produtos PRE-VENDA** soma os itens. Nestes pedidos os dois não batem — "
+                "normalmente desconto/ajuste aplicado só no cabeçalho ou item alterado depois.")
+            st.dataframe(
+                div,
+                column_config={
+                    'id': st.column_config.NumberColumn('Pedido', format="%d"),
+                    'data': st.column_config.DatetimeColumn('Data', format="DD/MM/YYYY"),
+                    'status': st.column_config.TextColumn('Status'),
+                    'valor_pedido': st.column_config.NumberColumn('Valor Pedido', format="R$ %.2f"),
+                    'valor_itens': st.column_config.NumberColumn('Soma Itens', format="R$ %.2f"),
+                    'diferenca': st.column_config.NumberColumn('Diferença', format="R$ %.2f"),
                 },
                 use_container_width=True, hide_index=True)
 
