@@ -354,21 +354,20 @@ def load_vendas_faixa_etaria(data_ini=None, data_fim=None) -> pd.DataFrame:
 
 
 def load_vendas_vendedor_estado(data_ini=None, data_fim=None) -> pd.DataFrame:
-    """Faturamento por vendedor × estado (deduzido pelo CEP do cliente)."""
-    clauses = [
-        _FILTRO_VALIDO,
-        "p.tipo_pedido = 'PRE-VENDA'",
-        "c.deleted_at IS NULL",
-        "c.cep_cliente IS NOT NULL",
-        "c.cep_cliente != ''",
-        r"c.cep_cliente ~ '^\d'",
-    ]
+    """Faturamento por vendedor × estado.
+
+    Atribuição pelo VENDEDOR DO PEDIDO (p.id_vendedor), não pelo vendedor do
+    cadastro do cliente. Inclui TODOS os pedidos PRE-VENDA válidos: cliente sem
+    CEP válido entra no estado 'Outro'. Assim o total bate com as demais abas.
+    """
+    clauses = [_FILTRO_VALIDO, "p.tipo_pedido = 'PRE-VENDA'"]
     params = {}
     _clausula_periodo(clauses, params, data_ini, data_fim)
     where = " AND ".join(clauses)
 
     sql = r"""
-        SELECT v.nome_vendedor AS vendedor,
+        WITH __CTE__
+        SELECT COALESCE(vm.nome_vendedor, 'SEM VENDEDOR') AS vendedor,
                CASE
                    WHEN c.cep_cliente ~ '^\d{5}'
                         AND CAST(LEFT(c.cep_cliente, 5) AS BIGINT) BETWEEN 66000 AND 68999 THEN 'PA'
@@ -378,17 +377,17 @@ def load_vendas_vendedor_estado(data_ini=None, data_fim=None) -> pd.DataFrame:
                         AND CAST(LEFT(c.cep_cliente, 5) AS BIGINT) BETWEEN 74000 AND 76999 THEN 'GO'
                    ELSE 'Outro'
                END AS estado,
-               COUNT(DISTINCT c.id_cliente) AS clientes,
+               COUNT(DISTINCT p.id_cliente) AS clientes,
                COUNT(p.id) AS pedidos,
                ROUND(AVG(p.valor_total)::numeric, 2) AS ticket,
                ROUND(SUM(p.valor_total)::numeric, 2) AS faturamento
-        FROM clientes c
-        JOIN vendedor v ON v.id_vendedor = c.id_geral_vendedor
-        JOIN pedido p ON p.id_cliente = c.id_cliente
+        FROM pedido p
+        LEFT JOIN vendedor_map vm ON vm.id_vendedor = p.id_vendedor
+        LEFT JOIN clientes c ON c.id_cliente = p.id_cliente
         WHERE __WHERE__
-        GROUP BY v.nome_vendedor, estado
+        GROUP BY vendedor, estado
         ORDER BY faturamento DESC
-    """.replace("__WHERE__", where)
+    """.replace("__CTE__", _VENDEDOR_CTE).replace("__WHERE__", where)
     return _query(sql, params)
 
 
