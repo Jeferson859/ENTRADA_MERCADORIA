@@ -446,6 +446,50 @@ def load_divergencia_pedido_itens(data_ini=None, data_fim=None) -> pd.DataFrame:
     return _query(sql, params)
 
 
+def load_giro_estoque(dias: int = 30) -> pd.DataFrame:
+    """Giro e cobertura de estoque por produto.
+
+    Saídas: itens ATIVOS de pedidos válidos (PRE-VENDA, BRINDE e REPOSICAO)
+    nos últimos `dias`. Estoque: estoque_geral.saldo_disponivel.
+    - giro            = saída do período ÷ estoque atual
+    - cobertura_dias  = estoque atual ÷ média diária de saída
+    """
+    sql = """
+        WITH saidas AS (
+            SELECT pi.id_produto,
+                   SUM(pi.quantidade) AS qtd_saida
+            FROM pedido p
+            JOIN pedido_itens pi ON pi.id_pedido = p.id
+            WHERE p.cancelado_em IS NULL
+              AND p.status != 'CANCELADO'
+              AND p.tipo_pedido IN ('PRE-VENDA', 'BRINDE', 'REPOSICAO')
+              AND COALESCE(pi.status, 'ATIVO') = 'ATIVO'
+              AND p.data >= CURRENT_DATE - make_interval(days => :dias)
+            GROUP BY pi.id_produto
+        )
+        SELECT pr.cod_barras,
+               pr.nome_produto AS produto,
+               COALESCE(eg.saldo_disponivel, 0)  AS estoque,
+               COALESCE(s.qtd_saida, 0)          AS saida_periodo,
+               ROUND(COALESCE(s.qtd_saida, 0)::numeric / :dias, 2) AS media_dia,
+               CASE WHEN COALESCE(eg.saldo_disponivel, 0) > 0
+                    THEN ROUND(COALESCE(s.qtd_saida, 0)::numeric
+                               / eg.saldo_disponivel, 2)
+               END AS giro,
+               CASE WHEN COALESCE(s.qtd_saida, 0) > 0
+                    THEN ROUND(COALESCE(eg.saldo_disponivel, 0)::numeric
+                               * :dias / s.qtd_saida, 1)
+               END AS cobertura_dias
+        FROM produto pr
+        LEFT JOIN estoque_geral eg ON eg.id_produto = pr.id_produto
+        LEFT JOIN saidas s ON s.id_produto = pr.id_produto
+        WHERE COALESCE(eg.saldo_disponivel, 0) > 0
+           OR COALESCE(s.qtd_saida, 0) > 0
+        ORDER BY cobertura_dias ASC NULLS LAST
+    """
+    return _query(sql, {"dias": int(dias)})
+
+
 def load_produtos_por_tipo(tipo_pedido: str = "PRE-VENDA", data_ini=None, data_fim=None) -> pd.DataFrame:
     """Ranking de produtos por faturamento para um tipo de pedido (PRE-VENDA, BRINDE etc.)."""
     clauses = [
