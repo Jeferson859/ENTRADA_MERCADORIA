@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 from db import (
     load_vendas_por_rota,
@@ -57,12 +57,29 @@ PL = dict(
 # ── FILTRO DE PERÍODO (sidebar — vale para todas as abas) ────────────────────
 with st.sidebar:
     st.header("Filtros — Dashboard")
-    col_di, col_df = st.columns(2)
-    with col_di:
-        f_ini = st.date_input("De", value=None, key="dash_ini")
-    with col_df:
-        f_fim = st.date_input("Até", value=None, key="dash_fim")
-    st.caption("Vazio = histórico completo")
+
+    preset = st.radio(
+        "Período",
+        ["Tudo", "Últimos 30 dias", "Últimos 90 dias", "Este ano", "Personalizado"],
+        index=0,
+    )
+
+    f_ini, f_fim = None, None
+    hoje = date.today()
+    if preset == "Últimos 30 dias":
+        f_ini = hoje - timedelta(days=30)
+    elif preset == "Últimos 90 dias":
+        f_ini = hoje - timedelta(days=90)
+    elif preset == "Este ano":
+        f_ini = date(hoje.year, 1, 1)
+    elif preset == "Personalizado":
+        col_di, col_df = st.columns(2)
+        with col_di:
+            f_ini = st.date_input("De", value=None, key="dash_ini")
+        with col_df:
+            f_fim = st.date_input("Até", value=None, key="dash_fim")
+
+    st.markdown("---")
     if st.button("🔄 Recarregar dados"):
         st.cache_data.clear()
         st.rerun()
@@ -121,10 +138,18 @@ def kpi(col, label, value, series=None, color=CYAN, sub=None):
             f'<div>{spark}</div></div>',
             unsafe_allow_html=True)
 
+def col_moeda(label):
+    return st.column_config.NumberColumn(label, format="R$ %.0f")
+
+def col_progresso(label, max_val):
+    return st.column_config.ProgressColumn(
+        label, format="R$ %.0f", min_value=0, max_value=float(max_val or 1))
+
 # ── HEADER ────────────────────────────────────────────────────────────────────
-periodo_txt = "histórico completo"
-if f_ini or f_fim:
-    periodo_txt = f"{f_ini.strftime('%d/%m/%y') if f_ini else '...'} → {f_fim.strftime('%d/%m/%y') if f_fim else 'hoje'}"
+periodo_txt = "histórico completo" if preset == "Tudo" else preset.lower()
+if preset == "Personalizado":
+    periodo_txt = (f"{f_ini.strftime('%d/%m/%y') if f_ini else '...'} → "
+                   f"{f_fim.strftime('%d/%m/%y') if f_fim else 'hoje'}")
 
 st.markdown(
     f'## 📊 Dashboard de Vendas — SGV&nbsp;&nbsp;'
@@ -143,13 +168,24 @@ with tabs[0]:
     rotas = fetch_rotas(f_ini, f_fim)
     trend = fetch_trend(f_ini, f_fim)
 
+    # Filtros da aba
+    fc1, fc2 = st.columns([3, 1])
+    with fc1:
+        sel_rotas = st.multiselect(
+            "🛣️ Filtrar rotas específicas (vazio = todas)",
+            rotas.rota.tolist(), key="sel_rotas")
+    with fc2:
+        top_n = st.slider("Top N no gráfico", 5, 50, 20, 5, key="topn_rotas")
+
+    rotas_f = rotas[rotas.rota.isin(sel_rotas)] if sel_rotas else rotas
+
     # KPIs
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Total de Rotas", str(len(rotas)),
+    kpi(c1, "Total de Rotas", str(len(rotas_f)),
         trend.pedidos, PURPLE)
-    kpi(c2, "Faturamento Total", brl(rotas.fat_total.sum()),
+    kpi(c2, "Faturamento Total", brl(rotas_f.fat_total.sum()),
         trend.faturamento, CYAN)
-    kpi(c3, "Ticket Médio Geral", brl(rotas.ticket.mean()),
+    kpi(c3, "Ticket Médio Geral", brl(rotas_f.ticket.mean()) if len(rotas_f) else "—",
         trend.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
@@ -172,29 +208,32 @@ with tabs[0]:
     p25 = rotas.fat_sem.quantile(.25); p75 = rotas.fat_sem.quantile(.75)
     ca, cb = st.columns([5, 6])
     with ca:
-        st.markdown("### Top 20 Rotas — Média Semanal (R$)")
-        d20 = rotas.head(20)
+        st.markdown(f"### Top {top_n} Rotas — Média Semanal (R$)")
+        d_top = rotas_f.head(top_n)
         fb = go.Figure(go.Bar(
-            x=d20.fat_sem, y=d20.rota, orientation='h',
-            marker=dict(color=d20.fat_sem, colorscale=HEAT,
+            x=d_top.fat_sem, y=d_top.rota, orientation='h',
+            marker=dict(color=d_top.fat_sem, colorscale=HEAT,
                         showscale=False, line=dict(width=0)),
-            text=d20.fat_sem.apply(brls), textposition='outside',
+            text=d_top.fat_sem.apply(brls), textposition='outside',
             textfont=dict(size=9, color='#8B92A5')))
-        fb.update_layout(**PL, height=560)
+        fb.update_layout(**PL, height=max(360, 28*len(d_top)))
         fb.update_yaxes(autorange='reversed', tickfont=dict(size=9))
         fb.update_xaxes(visible=False)
         st.plotly_chart(fb, use_container_width=True)
     with cb:
         st.markdown("### Visão Detalhada por Rota")
-        rt = rotas.copy()
+        rt = rotas_f.copy()
         rt['Status'] = rt.fat_sem.apply(lambda v: badge(v, p25, p75))
-        rt['fat_sem'] = rt['fat_sem'].apply(brl)
-        rt['ticket'] = rt['ticket'].apply(brl)
         rt.index = range(1, len(rt)+1); rt.index.name = 'Pos.'
         st.dataframe(
-            rt[['rota','ped_sem','fat_sem','ticket','Status']].rename(columns={
-                'rota':'Rota','ped_sem':'Ped/Sem',
-                'fat_sem':'Fat/Sem (R$)','ticket':'Ticket Médio','Status':'Status'}),
+            rt[['rota','ped_sem','fat_sem','ticket','Status']],
+            column_config={
+                'rota': st.column_config.TextColumn('Rota'),
+                'ped_sem': st.column_config.NumberColumn('Ped/Sem', format="%.1f"),
+                'fat_sem': col_progresso('Fat/Sem', rotas.fat_sem.max()),
+                'ticket': col_moeda('Ticket Médio'),
+                'Status': st.column_config.TextColumn('Status'),
+            },
             height=560, use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -204,12 +243,14 @@ with tabs[1]:
     fe = fetch_faixa_etaria(f_ini, f_fim)
 
     imc = fe.clientes.idxmax(); imt = fe.ticket.idxmax()
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     kpi(c1, "Faixas Mapeadas", str(len(fe)), fe.clientes, PURPLE)
     kpi(c2, "Total Clientes",
         f"{int(fe.clientes.sum()):,}".replace(",","."), fe.faturamento, CYAN)
     kpi(c3, "Faixa Dominante", fe.loc[imc,'faixa'], fe.clientes, GREEN,
         f"{int(fe.clientes.max()):,}".replace(",",".")+" clientes")
+    kpi(c4, "Maior Ticket", fe.loc[imt,'faixa'], fe.ticket, AMBER,
+        brl(fe.ticket.max()))
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
     st.markdown("---")
 
@@ -250,12 +291,18 @@ with tabs[1]:
         st.plotly_chart(fg3, use_container_width=True)
 
     st.markdown("---")
-    fe_disp = fe.copy()
-    fe_disp['ticket'] = fe_disp['ticket'].apply(brl)
-    fe_disp['faturamento']= fe_disp['faturamento'].apply(brl)
-    st.dataframe(fe_disp.rename(columns={
-        'faixa':'Faixa','clientes':'Clientes','pedidos':'Pedidos',
-        'ticket':'Ticket Médio','faturamento':'Faturamento'}),
+    fe_t = fe.copy()
+    fe_t['pct_clientes'] = (fe_t.clientes / fe_t.clientes.sum() * 100).round(1)
+    st.dataframe(
+        fe_t[['faixa','clientes','pct_clientes','pedidos','ticket','faturamento']],
+        column_config={
+            'faixa': st.column_config.TextColumn('Faixa'),
+            'clientes': st.column_config.NumberColumn('Clientes', format="%d"),
+            'pct_clientes': st.column_config.NumberColumn('% Clientes', format="%.1f%%"),
+            'pedidos': st.column_config.NumberColumn('Pedidos', format="%d"),
+            'ticket': col_moeda('Ticket Médio'),
+            'faturamento': col_progresso('Faturamento', fe_t.faturamento.max()),
+        },
         use_container_width=True, hide_index=True)
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -263,14 +310,25 @@ with tabs[1]:
 # ════════════════════════════════════════════════════════════════════════════
 with tabs[2]:
     vd = fetch_vendedor_estado(f_ini, f_fim)
-    res = (vd.groupby('vendedor')
+
+    # Filtros da aba
+    fc1, fc2 = st.columns([2, 1])
+    with fc1:
+        estados = ["Todos"] + sorted(vd.estado.unique().tolist())
+        sel_estado = st.selectbox("📍 Estado", estados, key="sel_estado")
+    with fc2:
+        top_v = st.slider("Top N vendedores", 5, 40, 20, 5, key="topn_vend")
+
+    vd_f = vd if sel_estado == "Todos" else vd[vd.estado == sel_estado]
+
+    res = (vd_f.groupby('vendedor')
              .agg(fat=('faturamento','sum'), ped=('pedidos','sum'),
                   cli=('clientes','sum'), ticket=('ticket','mean'))
              .sort_values('fat', ascending=False))
 
     c1, c2, c3 = st.columns(3)
-    kpi(c1, "Vendedores", str(vd.vendedor.nunique()), res.fat, PURPLE)
-    kpi(c2, "Faturamento Total", brl(vd.faturamento.sum()), res.fat, CYAN)
+    kpi(c1, "Vendedores", str(vd_f.vendedor.nunique()), res.fat, PURPLE)
+    kpi(c2, "Faturamento Total", brl(vd_f.faturamento.sum()), res.fat, CYAN)
     if len(res) > 0:
         kpi(c3, "Top Vendedor", res.index[0][:22], res.fat, GREEN,
             brl(res.fat.iloc[0]))
@@ -282,12 +340,12 @@ with tabs[2]:
     ca, cb = st.columns([3, 2])
     with ca:
         st.markdown("### 🗺️ Heatmap — Faturamento por Vendedor × Estado")
-        pivot = vd.pivot_table(
+        pivot = vd_f.pivot_table(
             values='faturamento', index='vendedor', columns='estado',
             aggfunc='sum', fill_value=0)
         pivot['_t'] = pivot.sum(axis=1)
         pivot = (pivot.sort_values('_t', ascending=False)
-                      .drop(columns='_t').head(20))
+                      .drop(columns='_t').head(top_v))
         z_text = pivot.map(lambda v: brls(v) if v > 0 else "")
         fh = px.imshow(pivot, color_continuous_scale=HEAT, aspect='auto', zmin=0)
         fh.update_traces(
@@ -300,13 +358,16 @@ with tabs[2]:
         st.plotly_chart(fh, use_container_width=True)
     with cb:
         st.markdown("### Ranking de Vendedores")
-        res_disp = res.copy()
-        res_disp['fat'] = res_disp['fat'].apply(brl)
-        res_disp['ticket'] = res_disp['ticket'].apply(brl)
-        st.dataframe(res_disp.rename(columns={
-            'fat':'Faturamento','ped':'Pedidos',
-            'cli':'Clientes','ticket':'Ticket Médio'}),
-            height=520, use_container_width=True)
+        st.dataframe(
+            res.reset_index(),
+            column_config={
+                'vendedor': st.column_config.TextColumn('Vendedor'),
+                'fat': col_progresso('Faturamento', res.fat.max() if len(res) else 1),
+                'ped': st.column_config.NumberColumn('Pedidos', format="%d"),
+                'cli': st.column_config.NumberColumn('Clientes', format="%d"),
+                'ticket': col_moeda('Ticket Médio'),
+            },
+            height=520, use_container_width=True, hide_index=True)
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 4 – BRINDES
@@ -320,12 +381,16 @@ with tabs[3]:
         f"{int(br.qtd.sum()):,}".replace(",","."), br.qtd, RED)
     kpi(c3, "Valor Total", brl(br.faturamento.sum()), br.faturamento, PURPLE)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
+
+    busca_br = st.text_input("🔍 Buscar brinde", "", key="busca_br",
+                             placeholder="Digite parte do nome...")
+    brf = br[br.produto.str.contains(busca_br, case=False, na=False)] if busca_br else br
     st.markdown("---")
 
     ca, cb = st.columns([2, 3])
     with ca:
         st.markdown("### Top 15 Brindes")
-        d15 = br.head(15)
+        d15 = brf.head(15)
         fbar = go.Figure(go.Bar(
             x=d15.faturamento, y=d15.produto, orientation='h',
             marker=dict(color=d15.faturamento, colorscale=HEAT_WARM,
@@ -338,12 +403,15 @@ with tabs[3]:
         st.plotly_chart(fbar, use_container_width=True)
     with cb:
         st.markdown("### Lista Completa")
-        br_disp = br.copy()
-        br_disp['preco'] = br_disp['preco'].apply(brl)
-        br_disp['faturamento'] = br_disp['faturamento'].apply(brl)
-        st.dataframe(br_disp.rename(columns={
-            'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
-            'preco':'Preço Médio','faturamento':'Valor Total'}),
+        st.dataframe(
+            brf,
+            column_config={
+                'produto': st.column_config.TextColumn('Produto'),
+                'qtd': st.column_config.NumberColumn('Qtd', format="%d"),
+                'pedidos': st.column_config.NumberColumn('Pedidos', format="%d"),
+                'preco': col_moeda('Preço Médio'),
+                'faturamento': col_progresso('Valor Total', br.faturamento.max()),
+            },
             height=490, use_container_width=True, hide_index=True)
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -359,20 +427,30 @@ with tabs[4]:
     kpi(c3, "Faturamento Total", brl(pv.faturamento.sum()), pv.faturamento, GREEN)
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
 
-    busca = st.text_input("🔍 Buscar produto", "", key="busca_pv",
-                          placeholder="Digite parte do nome...")
+    fc1, fc2 = st.columns([3, 1])
+    with fc1:
+        busca = st.text_input("🔍 Buscar produto", "", key="busca_pv",
+                              placeholder="Digite parte do nome...")
+    with fc2:
+        metrica = st.radio("Ranking por", ["Faturamento", "Quantidade"],
+                           horizontal=True, key="metrica_pv")
+
+    col_rank = "faturamento" if metrica == "Faturamento" else "qtd"
     dff = pv[pv.produto.str.contains(busca, case=False, na=False)] if busca else pv
+    dff = dff.sort_values(col_rank, ascending=False)
     st.markdown("---")
 
     ca, cb = st.columns([3, 4])
     with ca:
-        st.markdown("### Top 15 Produtos — Faturamento")
+        st.markdown(f"### Top 15 Produtos — {metrica}")
         d15 = dff.head(15)
+        txt = d15[col_rank].apply(brls) if col_rank == "faturamento" \
+              else d15[col_rank].apply(lambda v: f"{int(v):,}".replace(",","."))
         fpv = go.Figure(go.Bar(
-            x=d15.faturamento, y=d15.produto, orientation='h',
-            marker=dict(color=d15.faturamento, colorscale=HEAT_GREEN,
+            x=d15[col_rank], y=d15.produto, orientation='h',
+            marker=dict(color=d15[col_rank], colorscale=HEAT_GREEN,
                         showscale=False, line=dict(width=0)),
-            text=d15.faturamento.apply(brls), textposition='outside',
+            text=txt, textposition='outside',
             textfont=dict(size=9, color='#8B92A5')))
         fpv.update_layout(**PL, height=490)
         fpv.update_yaxes(autorange='reversed', tickfont=dict(size=9))
@@ -380,10 +458,13 @@ with tabs[4]:
         st.plotly_chart(fpv, use_container_width=True)
     with cb:
         st.markdown("### Ranking Completo")
-        dff_disp = dff.copy()
-        dff_disp['preco'] = dff_disp['preco'].apply(brl)
-        dff_disp['faturamento'] = dff_disp['faturamento'].apply(brl)
-        st.dataframe(dff_disp.rename(columns={
-            'produto':'Produto','qtd':'Qtd','pedidos':'Pedidos',
-            'preco':'Preço Médio','faturamento':'Faturamento'}),
+        st.dataframe(
+            dff,
+            column_config={
+                'produto': st.column_config.TextColumn('Produto'),
+                'qtd': st.column_config.NumberColumn('Qtd', format="%d"),
+                'pedidos': st.column_config.NumberColumn('Pedidos', format="%d"),
+                'preco': col_moeda('Preço Médio'),
+                'faturamento': col_progresso('Faturamento', pv.faturamento.max()),
+            },
             height=490, use_container_width=True, hide_index=True)
