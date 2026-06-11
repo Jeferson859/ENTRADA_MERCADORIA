@@ -434,15 +434,15 @@ def load_divergencia_pedido_itens(data_ini=None, data_fim=None) -> pd.DataFrame:
             p.data,
             p.status,
             ROUND(p.valor_total::numeric, 2) AS valor_pedido,
-            ROUND(SUM(pi.valor_total) FILTER (WHERE COALESCE(pi.status, '') != 'CANCELADO')::numeric, 2) AS valor_itens,
-            ROUND((COALESCE(SUM(pi.valor_total) FILTER (WHERE COALESCE(pi.status, '') != 'CANCELADO'), 0) - p.valor_total)::numeric, 2) AS diferenca
+            ROUND(SUM(pi.valor_total) FILTER (WHERE COALESCE(pi.status, 'ATIVO') = 'ATIVO')::numeric, 2) AS valor_itens,
+            ROUND((COALESCE(SUM(pi.valor_total) FILTER (WHERE COALESCE(pi.status, 'ATIVO') = 'ATIVO'), 0) - p.valor_total)::numeric, 2) AS diferenca
         FROM pedido p
         JOIN pedido_itens pi ON pi.id_pedido = p.id
         WHERE {where}
         GROUP BY p.id, p.data, p.status, p.valor_total
-        HAVING ROUND(COALESCE(SUM(pi.valor_total) FILTER (WHERE COALESCE(pi.status, '') != 'CANCELADO'), 0)::numeric, 2)
+        HAVING ROUND(COALESCE(SUM(pi.valor_total) FILTER (WHERE COALESCE(pi.status, 'ATIVO') = 'ATIVO'), 0)::numeric, 2)
                <> ROUND(p.valor_total::numeric, 2)
-        ORDER BY ABS(COALESCE(SUM(pi.valor_total) FILTER (WHERE COALESCE(pi.status, '') != 'CANCELADO'), 0) - p.valor_total) DESC
+        ORDER BY ABS(COALESCE(SUM(pi.valor_total) FILTER (WHERE COALESCE(pi.status, 'ATIVO') = 'ATIVO'), 0) - p.valor_total) DESC
     """
     return _query(sql, params)
 
@@ -452,7 +452,7 @@ def load_produtos_por_tipo(tipo_pedido: str = "PRE-VENDA", data_ini=None, data_f
     clauses = [
         _FILTRO_VALIDO,
         "p.tipo_pedido = :tipo_pedido",
-        "COALESCE(pi.status, '') != 'CANCELADO'",  # ignora itens cancelados
+        "COALESCE(pi.status, 'ATIVO') = 'ATIVO'",  # conta só itens ativos (igual ao cabeçalho)
     ]
     params = {"tipo_pedido": tipo_pedido}
     _clausula_periodo(clauses, params, data_ini, data_fim)
