@@ -356,8 +356,8 @@ with tabs[2]:
             textfont=dict(size=9),
             hovertemplate='%{y} × %{x}<br>R$ %{z:,.0f}<extra></extra>')
         fh.update_layout(**PL, height=max(380, 34*len(pivot)),
-                         coloraxis_showscale=False,
-                         plot_bgcolor='rgba(123,97,255,.06)')
+                         coloraxis_showscale=False)
+        fh.update_layout(plot_bgcolor='rgba(123,97,255,.06)')
         fh.update_xaxes(tickfont=dict(size=11), side='top',
                         showgrid=False, fixedrange=True)
         fh.update_yaxes(tickfont=dict(size=9),
