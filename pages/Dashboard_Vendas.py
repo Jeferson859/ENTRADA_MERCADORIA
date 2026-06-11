@@ -251,7 +251,9 @@ with tabs[0]:
         fill='tozeroy', fillcolor='rgba(123,97,255,.08)',
         hovertemplate='%{x|%d/%m/%y}<br>R$ %{y:,.0f}<extra></extra>'))
     ft.update_layout(**PL, height=160, showlegend=False)
-    ft.update_xaxes(tickformat='%d/%m', tickfont=dict(size=9),
+    # Ticks exatamente nas segundas-feiras (início real de cada semana ISO)
+    ft.update_xaxes(tickmode='array', tickvals=trend.semana,
+                    tickformat='%d/%m', tickfont=dict(size=9),
                     gridcolor='rgba(255,255,255,.05)')
     ft.update_yaxes(tickformat=',.0f', tickfont=dict(size=9),
                     gridcolor='rgba(255,255,255,.05)')
