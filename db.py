@@ -417,6 +417,35 @@ def load_pedidos_sem_rota(data_ini=None, data_fim=None) -> pd.DataFrame:
     return _query(sql, params)
 
 
+def load_divergencia_pedido_itens(data_ini=None, data_fim=None) -> pd.DataFrame:
+    """Pedidos PRE-VENDA válidos cujo valor_total difere da soma dos itens.
+
+    Explica a diferença entre o Faturamento da aba Rotas (cabeçalho do pedido)
+    e o da aba Produtos PRE-VENDA (soma dos itens).
+    """
+    clauses = [_FILTRO_VALIDO, "p.tipo_pedido = 'PRE-VENDA'"]
+    params = {}
+    _clausula_periodo(clauses, params, data_ini, data_fim)
+    where = " AND ".join(clauses)
+
+    sql = f"""
+        SELECT
+            p.id,
+            p.data,
+            p.status,
+            ROUND(p.valor_total::numeric, 2) AS valor_pedido,
+            ROUND(SUM(pi.valor_total)::numeric, 2) AS valor_itens,
+            ROUND((SUM(pi.valor_total) - p.valor_total)::numeric, 2) AS diferenca
+        FROM pedido p
+        JOIN pedido_itens pi ON pi.id_pedido = p.id
+        WHERE {where}
+        GROUP BY p.id, p.data, p.status, p.valor_total
+        HAVING ROUND(SUM(pi.valor_total)::numeric, 2) <> ROUND(p.valor_total::numeric, 2)
+        ORDER BY ABS(SUM(pi.valor_total) - p.valor_total) DESC
+    """
+    return _query(sql, params)
+
+
 def load_produtos_por_tipo(tipo_pedido: str = "PRE-VENDA", data_ini=None, data_fim=None) -> pd.DataFrame:
     """Ranking de produtos por faturamento para um tipo de pedido (PRE-VENDA, BRINDE etc.)."""
     clauses = [_FILTRO_VALIDO, "p.tipo_pedido = :tipo_pedido"]
