@@ -392,6 +392,31 @@ def load_vendas_vendedor_estado(data_ini=None, data_fim=None) -> pd.DataFrame:
     return _query(sql, params)
 
 
+def load_pedidos_sem_rota(data_ini=None, data_fim=None) -> pd.DataFrame:
+    """Pedidos PRE-VENDA válidos SEM rota vinculada (ficam fora da aba Rotas)."""
+    clauses = [_FILTRO_VALIDO, "p.tipo_pedido = 'PRE-VENDA'", "p.id_rota IS NULL"]
+    params = {}
+    _clausula_periodo(clauses, params, data_ini, data_fim)
+    where = " AND ".join(clauses)
+
+    sql = f"""
+        WITH {_VENDEDOR_CTE}
+        SELECT
+            p.id,
+            p.data,
+            p.id_cliente,
+            vm.nome_vendedor AS vendedor,
+            p.status,
+            p.valor_total,
+            p.obs
+        FROM pedido p
+        LEFT JOIN vendedor_map vm ON vm.id_vendedor = p.id_vendedor
+        WHERE {where}
+        ORDER BY p.valor_total DESC
+    """
+    return _query(sql, params)
+
+
 def load_produtos_por_tipo(tipo_pedido: str = "PRE-VENDA", data_ini=None, data_fim=None) -> pd.DataFrame:
     """Ranking de produtos por faturamento para um tipo de pedido (PRE-VENDA, BRINDE etc.)."""
     clauses = [_FILTRO_VALIDO, "p.tipo_pedido = :tipo_pedido"]
