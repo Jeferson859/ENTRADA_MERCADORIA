@@ -19,7 +19,7 @@ st.set_page_config(page_title="Dashboard de Vendas", page_icon="📊", layout="w
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""<style>
-.block-container{padding-top:.7rem;padding-bottom:.5rem;max-width:100%}
+.block-container{padding-top:2.4rem;padding-bottom:.5rem;max-width:100%}
 .kpi-card{
   background:linear-gradient(135deg,rgba(123,97,255,.13) 0%,rgba(0,212,255,.07) 100%);
   border:1px solid rgba(123,97,255,.35);border-radius:14px;
@@ -270,7 +270,9 @@ with tabs[0]:
                         showscale=False, line=dict(width=0)),
             text=d_top.fat_sem.apply(brls), textposition='outside',
             textfont=dict(size=9, color='#8B92A5')))
+        fb.update_traces(cliponaxis=False)  # não corta o rótulo na borda
         fb.update_layout(**PL, height=max(360, 28*len(d_top)))
+        fb.update_layout(margin=dict(l=0, r=52, t=30, b=0))
         fb.update_yaxes(autorange='reversed', tickfont=dict(size=9))
         fb.update_xaxes(visible=False)
         st.plotly_chart(fb, use_container_width=True)
@@ -317,6 +319,7 @@ with tabs[1]:
                         showscale=False, line=dict(width=0)),
             text=fe.ticket.apply(lambda v: f"R${v:,.0f}".replace(",",".")),
             textposition='outside', textfont=dict(size=10)))
+        fg.update_traces(cliponaxis=False)
         fg.update_layout(**PL, height=340)
         fg.update_xaxes(tickfont=dict(size=11))
         fg.update_yaxes(visible=False)
@@ -329,6 +332,7 @@ with tabs[1]:
                         showscale=False, line=dict(width=0)),
             text=fe.faturamento.apply(brls),
             textposition='outside', textfont=dict(size=10)))
+        fg2.update_traces(cliponaxis=False)
         fg2.update_layout(**PL, height=340)
         fg2.update_xaxes(tickfont=dict(size=11))
         fg2.update_yaxes(visible=False)
@@ -457,7 +461,9 @@ with tabs[3]:
                         showscale=False, line=dict(width=0)),
             text=d15.faturamento.apply(brls), textposition='outside',
             textfont=dict(size=9, color='#8B92A5')))
+        fbar.update_traces(cliponaxis=False)
         fbar.update_layout(**PL, height=490)
+        fbar.update_layout(margin=dict(l=0, r=52, t=30, b=0))
         fbar.update_yaxes(autorange='reversed', tickfont=dict(size=9))
         fbar.update_xaxes(visible=False)
         st.plotly_chart(fbar, use_container_width=True)
@@ -512,7 +518,9 @@ with tabs[4]:
                         showscale=False, line=dict(width=0)),
             text=txt, textposition='outside',
             textfont=dict(size=9, color='#8B92A5')))
+        fpv.update_traces(cliponaxis=False)
         fpv.update_layout(**PL, height=490)
+        fpv.update_layout(margin=dict(l=0, r=52, t=30, b=0))
         fpv.update_yaxes(autorange='reversed', tickfont=dict(size=9))
         fpv.update_xaxes(visible=False)
         st.plotly_chart(fpv, use_container_width=True)
