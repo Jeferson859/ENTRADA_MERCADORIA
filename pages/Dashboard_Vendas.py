@@ -348,15 +348,20 @@ with tabs[2]:
         pivot['_t'] = pivot.sum(axis=1)
         pivot = (pivot.sort_values('_t', ascending=False)
                       .drop(columns='_t').head(top_v))
-        z_text = pivot.map(lambda v: brls(v) if v > 0 else "")
+        z_text = pivot.map(lambda v: brls(v) if v > 0 else "—")
         fh = px.imshow(pivot, color_continuous_scale=HEAT, aspect='auto', zmin=0)
         fh.update_traces(
+            xgap=4, ygap=4,  # separa as células formando uma grade organizada
             text=z_text.values, texttemplate="%{text}",
             textfont=dict(size=9),
             hovertemplate='%{y} × %{x}<br>R$ %{z:,.0f}<extra></extra>')
-        fh.update_layout(**PL, height=520, coloraxis_showscale=False)
-        fh.update_xaxes(tickfont=dict(size=11), side='top')
-        fh.update_yaxes(tickfont=dict(size=9))
+        fh.update_layout(**PL, height=max(380, 34*len(pivot)),
+                         coloraxis_showscale=False,
+                         plot_bgcolor='rgba(123,97,255,.06)')
+        fh.update_xaxes(tickfont=dict(size=11), side='top',
+                        showgrid=False, fixedrange=True)
+        fh.update_yaxes(tickfont=dict(size=9),
+                        showgrid=False, fixedrange=True)
         st.plotly_chart(fh, use_container_width=True)
     with cb:
         st.markdown("### Ranking de Vendedores")
