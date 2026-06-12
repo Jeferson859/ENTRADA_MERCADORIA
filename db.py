@@ -451,6 +451,17 @@ def load_empresas() -> pd.DataFrame:
     return _query("SELECT id_empresa, nome_empresa FROM empresa ORDER BY nome_empresa")
 
 
+def load_colunas(tabelas: list) -> pd.DataFrame:
+    """Diagnóstico: lista as colunas das tabelas informadas."""
+    sql = """
+        SELECT table_name, column_name, data_type
+        FROM information_schema.columns
+        WHERE table_name = ANY(:tabs)
+        ORDER BY table_name, ordinal_position
+    """
+    return _query(sql, {"tabs": list(tabelas)})
+
+
 def load_giro_estoque(dias: int = 30, id_empresa=None) -> pd.DataFrame:
     """Giro e cobertura de estoque por produto, separado por EMPRESA.
 
