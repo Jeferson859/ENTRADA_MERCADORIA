@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 
-from db import load_empresas, load_giro_estoque
+from db import load_empresas, load_giro_estoque, load_colunas
 
 st.set_page_config(page_title="Estoque", page_icon="📦", layout="wide")
 
@@ -93,7 +93,16 @@ with fc3:
     busca = st.text_input("🔍 Buscar produto", "", key="est_busca",
                           placeholder="Digite parte do nome...")
 
-ge = fetch_giro(janela, emp_id)
+try:
+    ge = fetch_giro(janela, emp_id)
+except Exception as exc:
+    st.error(f"Erro na consulta de giro: {exc}")
+    st.markdown("### 🔧 Diagnóstico — colunas das tabelas envolvidas")
+    st.dataframe(
+        load_colunas(['pedido', 'rotas', 'vendedor', 'clientes',
+                      'estoque_geral', 'empresa']),
+        use_container_width=True, hide_index=True, height=600)
+    st.stop()
 
 def status_giro(r):
     if r.saida_periodo > 0 and r.estoque <= 0:
