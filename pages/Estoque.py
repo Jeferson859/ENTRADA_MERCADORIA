@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 
-from db import load_empresas, load_giro_estoque, load_colunas
+from db import load_empresas, load_giro_estoque, load_colunas, load_idade_estoque
 
 st.set_page_config(page_title="Estoque", page_icon="📦", layout="wide")
 
@@ -63,6 +63,10 @@ def fetch_empresas():
 @st.cache_data(ttl=600, show_spinner="Calculando giro de estoque...")
 def fetch_giro(dias, id_empresa):
     return load_giro_estoque(dias, id_empresa)
+
+@st.cache_data(ttl=600, show_spinner="Calculando idade do estoque...")
+def fetch_idade(id_empresa):
+    return load_idade_estoque(id_empresa)
 
 try:
     empresas = fetch_empresas()
@@ -138,8 +142,9 @@ else:
 
 gef = ge[ge.produto.str.contains(busca, case=False, na=False)] if busca else ge
 
-tab_giro, tab_compra, tab_abc = st.tabs(
-    ["📊 Giro e Cobertura", "🛒 Planejamento de Compra", "🔠 Curva ABC"])
+tab_giro, tab_compra, tab_abc, tab_idade = st.tabs(
+    ["📊 Giro e Cobertura", "🛒 Planejamento de Compra", "🔠 Curva ABC",
+     "⏰ Tempo Parado"])
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 1 — GIRO E COBERTURA
@@ -348,11 +353,101 @@ with tab_abc:
             },
             height=260, use_container_width=True, hide_index=True)
 
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 4 — TEMPO PARADO (idade do estoque)
+# ════════════════════════════════════════════════════════════════════════════
+with tab_idade:
+    ida = fetch_idade(emp_id).copy()
+    ida['estoque'] = pd.to_numeric(ida.estoque, errors='coerce')
+    ida['dias_parado'] = pd.to_numeric(ida.dias_parado, errors='coerce')
+    # junta a classe ABC calculada na janela atual
+    ida = ida.merge(ge[['produto', 'classe']], on='produto', how='left')
+    ida['classe'] = ida.classe.fillna('C')
+
+    def faixa_idade(d):
+        if pd.isna(d):
+            return '🚫 Nunca saiu'
+        if d <= 30:
+            return '🟢 0–30 dias'
+        if d <= 60:
+            return '🟡 31–60 dias'
+        if d <= 90:
+            return '🟠 61–90 dias'
+        if d <= 180:
+            return '🔴 91–180 dias'
+        return '⚫ +180 dias'
+
+    ida['faixa'] = ida.dias_parado.apply(faixa_idade)
+    idaf = ida[ida.produto.str.contains(busca, case=False, na=False)] if busca else ida
+
+    girando = (ida.dias_parado <= 30).sum()
+    p60_90 = ((ida.dias_parado > 30) & (ida.dias_parado <= 90)).sum()
+    p90 = (ida.dias_parado > 90).sum()
+    nunca = ida.dias_parado.isna().sum()
+    un_paradas = int(ida.loc[ida.dias_parado.fillna(9999) > 90, 'estoque'].sum())
+
+    c1, c2, c3, c4 = st.columns(4)
+    kpi(c1, "Girando (≤30d)", str(girando), GREEN, "saíram no último mês")
+    kpi(c2, "Esfriando (31–90d)", str(p60_90), AMBER, "atenção")
+    kpi(c3, "Parados +90d", str(p90), RED,
+        f"{un_paradas:,} unidades encalhadas".replace(",", "."))
+    kpi(c4, "Nunca Saíram", str(nunca), PURPLE, "estoque sem nenhuma venda")
+    st.markdown("---")
+
+    ca, cb = st.columns([2, 3])
+    with ca:
+        st.markdown("### 📊 Distribuição por Idade")
+        ordem = ['🟢 0–30 dias', '🟡 31–60 dias', '🟠 61–90 dias',
+                 '🔴 91–180 dias', '⚫ +180 dias', '🚫 Nunca saiu']
+        dist = (ida.groupby('faixa')
+                   .agg(produtos=('produto', 'count'),
+                        unidades=('estoque', 'sum'))
+                   .reindex(ordem).fillna(0))
+        cores_fx = [GREEN, AMBER, '#FF8C42', RED, '#666B78', PURPLE]
+        fd = go.Figure(go.Bar(
+            x=dist.index, y=dist.produtos,
+            marker=dict(color=cores_fx, line=dict(width=0)),
+            text=[f"{int(p)} prod.<br>{int(u):,} un.".replace(",", ".")
+                  for p, u in zip(dist.produtos, dist.unidades)],
+            textposition='outside', textfont=dict(size=9)))
+        fd.update_traces(cliponaxis=False)
+        fd.update_layout(**PL, height=400)
+        fd.update_layout(margin=dict(l=0, r=4, t=50, b=0))
+        fd.update_xaxes(tickfont=dict(size=9))
+        fd.update_yaxes(visible=False)
+        st.plotly_chart(fd, use_container_width=True)
+        st.caption("Tempo desde a última saída de cada produto que tem saldo em estoque.")
+    with cb:
+        st.markdown("### 🗃️ Produtos por Tempo Parado")
+        sel_faixa = st.multiselect("Filtrar por faixa (vazio = todas)",
+                                   ordem, key="idade_faixa")
+        itab = idaf[idaf.faixa.isin(sel_faixa)] if sel_faixa else idaf
+        itab = itab.sort_values('dias_parado', ascending=False, na_position='first')
+        st.dataframe(
+            itab[['produto', 'classe', 'estoque', 'ultima_saida',
+                  'dias_parado', 'faixa']],
+            column_config={
+                'produto': st.column_config.TextColumn('Produto'),
+                'classe': st.column_config.TextColumn('ABC'),
+                'estoque': st.column_config.NumberColumn('Estoque', format="%d"),
+                'ultima_saida': st.column_config.DateColumn('Última Saída',
+                                                            format="DD/MM/YYYY"),
+                'dias_parado': st.column_config.NumberColumn('Dias Parado', format="%d"),
+                'faixa': st.column_config.TextColumn('Faixa'),
+            },
+            height=480, use_container_width=True, hide_index=True)
+        st.download_button(
+            "⬇️ Baixar lista de parados (CSV)",
+            data=itab[['produto', 'classe', 'estoque', 'ultima_saida',
+                       'dias_parado', 'faixa']].to_csv(index=False).encode('utf-8'),
+            file_name=f"tempo_parado_{emp_nome}.csv", mime="text/csv")
+
 st.caption(
     f"Empresa: **{emp_nome}** · Saídas = unidades de itens ativos em pedidos "
     f"PRE-VENDA, BRINDE e REPOSICAO da empresa nos últimos {janela} dias · "
     f"Estoque = saldo disponível atual da empresa · ABC = participação no volume "
-    f"de saída (A ≤ 80%, B ≤ 95%, C restante)")
+    f"de saída (A ≤ 80%, B ≤ 95%, C restante) · Tempo parado = dias desde a "
+    f"última saída do produto")
 
 with st.expander("🔧 Explorar colunas de uma tabela (diagnóstico)"):
     tab_nome = st.text_input("Nome da tabela", "produto", key="diag_tab")
