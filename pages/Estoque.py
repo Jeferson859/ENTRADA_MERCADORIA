@@ -224,8 +224,9 @@ with tab_compra:
 
     plan = gef[gef.media_dia > 0].copy()
     hoje = pd.Timestamp.today().normalize()
-    plan['cob'] = plan.cobertura_dias.fillna(0)
+    plan['cob'] = plan.cobertura_dias.fillna(0).clip(upper=3650)  # evita overflow de data
     plan['data_ruptura'] = (hoje + pd.to_timedelta(plan.cob, unit='D')).dt.strftime('%d/%m/%Y')
+    plan.loc[plan.cobertura_dias.fillna(0) > 3650, 'data_ruptura'] = '> 10 anos'
     plan.loc[plan.estoque <= 0, 'data_ruptura'] = '⚠️ JÁ ZEROU'
     plan['sugestao'] = ((plan.media_dia * (lead + alvo)) - plan.estoque).clip(lower=0).round(0)
     plan = plan[plan.sugestao > 0].sort_values(
