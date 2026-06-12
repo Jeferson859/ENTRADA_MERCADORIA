@@ -446,15 +446,29 @@ def load_divergencia_pedido_itens(data_ini=None, data_fim=None) -> pd.DataFrame:
     return _query(sql, params)
 
 
-def load_giro_estoque(dias: int = 30) -> pd.DataFrame:
-    """Giro e cobertura de estoque por produto.
+def load_empresas() -> pd.DataFrame:
+    """Empresas cadastradas (para separar estoques e giros)."""
+    return _query("SELECT id_empresa, nome_empresa FROM empresa ORDER BY nome_empresa")
+
+
+def load_giro_estoque(dias: int = 30, id_empresa=None) -> pd.DataFrame:
+    """Giro e cobertura de estoque por produto, separado por EMPRESA.
 
     Saídas: itens ATIVOS de pedidos válidos (PRE-VENDA, BRINDE e REPOSICAO)
-    nos últimos `dias`. Estoque: estoque_geral.saldo_disponivel.
+    nos últimos `dias`, da empresa informada. Estoque: estoque_geral.saldo_disponivel
+    da mesma empresa.
     - giro            = saída do período ÷ estoque atual
     - cobertura_dias  = estoque atual ÷ média diária de saída
     """
-    sql = """
+    params = {"dias": int(dias)}
+    filtro_emp_saida = ""
+    filtro_emp_estoque = ""
+    if id_empresa is not None:
+        params["emp"] = int(id_empresa)
+        filtro_emp_saida = "AND p.id_empresa = :emp"
+        filtro_emp_estoque = "AND eg.id_empresa = :emp"
+
+    sql = f"""
         WITH saidas AS (
             SELECT pi.id_produto,
                    SUM(pi.quantidade) AS qtd_saida
@@ -465,6 +479,7 @@ def load_giro_estoque(dias: int = 30) -> pd.DataFrame:
               AND p.tipo_pedido IN ('PRE-VENDA', 'BRINDE', 'REPOSICAO')
               AND COALESCE(pi.status, 'ATIVO') = 'ATIVO'
               AND p.data >= CURRENT_DATE - make_interval(days => :dias)
+              {filtro_emp_saida}
             GROUP BY pi.id_produto
         )
         SELECT pr.cod_barras,
@@ -481,13 +496,13 @@ def load_giro_estoque(dias: int = 30) -> pd.DataFrame:
                                * :dias / s.qtd_saida, 1)
                END AS cobertura_dias
         FROM produto pr
-        LEFT JOIN estoque_geral eg ON eg.id_produto = pr.id_produto
+        LEFT JOIN estoque_geral eg ON eg.id_produto = pr.id_produto {filtro_emp_estoque}
         LEFT JOIN saidas s ON s.id_produto = pr.id_produto
         WHERE COALESCE(eg.saldo_disponivel, 0) > 0
            OR COALESCE(s.qtd_saida, 0) > 0
         ORDER BY cobertura_dias ASC NULLS LAST
     """
-    return _query(sql, {"dias": int(dias)})
+    return _query(sql, params)
 
 
 def load_produtos_por_tipo(tipo_pedido: str = "PRE-VENDA", data_ini=None, data_fim=None) -> pd.DataFrame:
