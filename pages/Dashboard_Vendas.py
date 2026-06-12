@@ -578,21 +578,20 @@ with tabs[5]:
     ge = ge.copy()
     ge['status'] = ge.apply(status_giro, axis=1)
 
-    em_risco = (ge.status.isin(["🔴 Risco ruptura", "🔴 Sem estoque"])).sum()
+    sem_estoque = (ge.status == "🔴 Sem estoque").sum()
+    risco = (ge.status == "🔴 Risco ruptura").sum()
     parados = (ge.status == "🟡 Parado").sum()
-    excesso = (ge.status == "🟠 Excesso").sum()
     com_venda = ge[ge.saida_periodo > 0]
-    cobertura_mediana = com_venda.cobertura_dias.median() if len(com_venda) else 0
     giro_geral = (com_venda.saida_periodo.sum() / com_venda.estoque.sum()) \
                  if com_venda.estoque.sum() > 0 else 0
 
     c1, c2, c3, c4 = st.columns(4)
-    kpi(c1, "Risco de Ruptura", str(em_risco), None, RED,
-        f"cobertura ≤ {lead} dias")
-    kpi(c2, "Produtos Parados", str(parados), None, AMBER,
+    kpi(c1, "Sem Estoque", str(sem_estoque), None, RED,
+        "vendendo com saldo zerado")
+    kpi(c2, "Repor Urgente", str(risco), None, AMBER,
+        f"cobertura entre 1 e {lead} dias")
+    kpi(c3, "Produtos Parados", str(parados), None, PURPLE,
         f"sem saída em {janela} dias")
-    kpi(c3, "Cobertura Mediana", f"{cobertura_mediana:.0f} dias",
-        None, CYAN, "produtos com venda")
     kpi(c4, "Giro Geral", f"{giro_geral:.2f}x", None, GREEN,
         f"saída ÷ estoque em {janela} dias")
     st.markdown("<div style='margin:.4rem 0'></div>", unsafe_allow_html=True)
@@ -602,8 +601,10 @@ with tabs[5]:
 
     ca, cb = st.columns([2, 3])
     with ca:
-        st.markdown(f"### ⏳ Menores Coberturas (≤ {lead*2} dias)")
-        crit = gef[(gef.saida_periodo > 0) & (gef.cobertura_dias <= lead * 2)] \
+        st.markdown(f"### ⏳ Repor Urgente — cobertura de 1 a {lead*2} dias")
+        st.caption("Produtos com saldo zerado não entram aqui — estão no KPI 'Sem Estoque' e na tabela ao lado.")
+        crit = gef[(gef.saida_periodo > 0) & (gef.estoque > 0)
+                   & (gef.cobertura_dias <= lead * 2)] \
                 .nsmallest(15, 'cobertura_dias')
         if len(crit):
             fgi = go.Figure(go.Bar(
@@ -628,9 +629,15 @@ with tabs[5]:
             st.info("Nenhum produto com cobertura crítica. 👍")
     with cb:
         st.markdown("### Visão Completa por Produto")
+        sel_status = st.multiselect(
+            "Filtrar por status (vazio = todos)",
+            sorted(ge.status.unique().tolist()), key="giro_status")
+        gtab = gef[gef.status.isin(sel_status)] if sel_status else gef
+        gtab = gtab.sort_values(['estoque', 'saida_periodo'],
+                                ascending=[True, False])  # zerados que mais vendem primeiro
         st.dataframe(
-            gef[['produto','estoque','saida_periodo','media_dia',
-                 'giro','cobertura_dias','status']],
+            gtab[['produto','estoque','saida_periodo','media_dia',
+                  'giro','cobertura_dias','status']],
             column_config={
                 'produto': st.column_config.TextColumn('Produto'),
                 'estoque': st.column_config.NumberColumn('Estoque', format="%d"),
