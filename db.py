@@ -519,6 +519,46 @@ def load_giro_estoque(dias: int = 30, id_empresa=None) -> pd.DataFrame:
     return _query(sql, params)
 
 
+def load_idade_estoque(id_empresa=None) -> pd.DataFrame:
+    """Tempo parado: dias desde a ÚLTIMA saída de cada produto com estoque.
+
+    Considera saídas válidas (PRE-VENDA, BRINDE, REPOSICAO, itens ativos).
+    dias_parado = NULL → produto nunca teve saída registrada.
+    """
+    params = {}
+    filtro_emp_saida = ""
+    filtro_emp_estoque = ""
+    if id_empresa is not None:
+        params["emp"] = int(id_empresa)
+        filtro_emp_saida = ("AND p.id_vendedor IN "
+                            "(SELECT id_vendedor FROM vendedor WHERE id_empresa = :emp)")
+        filtro_emp_estoque = "AND eg.id_empresa = :emp"
+
+    sql = f"""
+        WITH ultima AS (
+            SELECT pi.id_produto, MAX(p.data) AS ultima_saida
+            FROM pedido p
+            JOIN pedido_itens pi ON pi.id_pedido = p.id
+            WHERE p.cancelado_em IS NULL
+              AND p.status != 'CANCELADO'
+              AND p.tipo_pedido IN ('PRE-VENDA', 'BRINDE', 'REPOSICAO')
+              AND COALESCE(pi.status, 'ATIVO') = 'ATIVO'
+              {filtro_emp_saida}
+            GROUP BY pi.id_produto
+        )
+        SELECT pr.nome_produto AS produto,
+               COALESCE(eg.saldo_disponivel, 0) AS estoque,
+               u.ultima_saida::date AS ultima_saida,
+               (CURRENT_DATE - u.ultima_saida::date) AS dias_parado
+        FROM estoque_geral eg
+        JOIN produto pr ON pr.id_produto = eg.id_produto
+        LEFT JOIN ultima u ON u.id_produto = eg.id_produto
+        WHERE COALESCE(eg.saldo_disponivel, 0) > 0 {filtro_emp_estoque}
+        ORDER BY dias_parado DESC NULLS FIRST
+    """
+    return _query(sql, params)
+
+
 def load_produtos_por_tipo(tipo_pedido: str = "PRE-VENDA", data_ini=None, data_fim=None) -> pd.DataFrame:
     """Ranking de produtos por faturamento para um tipo de pedido (PRE-VENDA, BRINDE etc.)."""
     clauses = [
