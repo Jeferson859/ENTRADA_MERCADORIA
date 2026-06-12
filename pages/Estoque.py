@@ -190,3 +190,12 @@ st.caption(
     f"Estoque = saldo disponível atual da empresa · "
     f"Cobertura = estoque ÷ média diária de saída · "
     f"Giro = saída do período ÷ estoque atual")
+
+with st.expander("🔧 Explorar colunas de uma tabela (diagnóstico)"):
+    tab_nome = st.text_input("Nome da tabela", "produto", key="diag_tab")
+    if tab_nome.strip():
+        try:
+            st.dataframe(load_colunas([tab_nome.strip()]),
+                         use_container_width=True, hide_index=True)
+        except Exception as exc:
+            st.error(f"Erro: {exc}")
