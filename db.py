@@ -497,6 +497,7 @@ def load_giro_estoque(dias: int = 30, id_empresa=None) -> pd.DataFrame:
         )
         SELECT pr.cod_barras,
                pr.nome_produto AS produto,
+               pr.id_fornecedor,
                COALESCE(eg.saldo_disponivel, 0)  AS estoque,
                COALESCE(s.qtd_saida, 0)          AS saida_periodo,
                ROUND(COALESCE(s.qtd_saida, 0)::numeric / :dias, 2) AS media_dia,
