@@ -476,7 +476,9 @@ def load_giro_estoque(dias: int = 30, id_empresa=None) -> pd.DataFrame:
     filtro_emp_estoque = ""
     if id_empresa is not None:
         params["emp"] = int(id_empresa)
-        filtro_emp_saida = "AND p.id_empresa = :emp"
+        # pedido não tem id_empresa: a empresa vem do vendedor do pedido
+        filtro_emp_saida = ("AND p.id_vendedor IN "
+                            "(SELECT id_vendedor FROM vendedor WHERE id_empresa = :emp)")
         filtro_emp_estoque = "AND eg.id_empresa = :emp"
 
     sql = f"""
