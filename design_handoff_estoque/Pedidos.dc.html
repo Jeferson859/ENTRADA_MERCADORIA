@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070B12;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(59,169,255,.22);border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(59,169,255,.4)}
+  ::placeholder{color:#4A5365}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:radial-gradient(1200px 600px at 80% -10%,rgba(46,124,246,.10),transparent 60%),#070B12;color:#D7DEEA;padding:26px 30px 40px;font-family:Inter,sans-serif">
+<div style="max-width:1400px;margin:0 auto">
+
+  <!-- HEADER -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,#2E7CF6,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:23px;box-shadow:0 6px 20px rgba(46,124,246,.35)">📋</div>
+      <div>
+        <div style="font-size:21px;font-weight:800;letter-spacing:-.02em;color:#F2F6FC">Pedidos — Movimentação &amp; Consulta</div>
+        <div style="font-size:12px;color:#6B7385;font-weight:500;margin-top:2px">Entrada de mercadoria · movimentação, busca e ajuste de estoque</div>
+      </div>
+    </div>
+    <div style="text-align:right;font-size:11px;color:#5A6275;line-height:1.5">
+      <div>Atualizado em <span style="color:#8B92A5">17/06/2026 14:32</span></div>
+      <div>últimos 35 dias · cache 1 min</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div style="display:flex;gap:5px;background:rgba(255,255,255,.03);padding:5px;border-radius:12px;margin-bottom:16px;width:max-content">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+      <button onClick="{{ t.onClick }}" style="border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:9px 18px;border-radius:9px;background:{{ t.bg }};color:{{ t.fg }};transition:all .15s">{{ t.label }}</button>
+    </sc-for>
+  </div>
+
+  <!-- ===== MOVIMENTAÇÃO ===== -->
+  <sc-if value="{{ tabMov }}" hint-placeholder-val="{{ true }}">
+    <!-- filters -->
+    <div style="background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:16px 18px;margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:1 1 240px;min-width:200px">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600;margin-bottom:7px">Buscar</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.5">🔍</span>
+          <input value="{{ fBusca }}" onChange="{{ setFBusca }}" placeholder="ID, cliente, vendedor..." style="width:100%;background:#0E1422;border:1px solid rgba(59,169,255,.2);color:#E4EAF3;font-size:13px;padding:10px 12px 10px 34px;border-radius:10px;font-family:inherit;outline:none">
+        </div>
+      </div>
+      <div style="flex:0 1 170px">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600;margin-bottom:7px">Status</div>
+        <select value="{{ fStatus }}" onChange="{{ setFStatus }}" style="width:100%;background:#0E1422;border:1px solid rgba(59,169,255,.2);color:#E4EAF3;font-size:13px;padding:10px 12px;border-radius:10px;font-family:inherit;cursor:pointer;outline:none">
+          <sc-for list="{{ statusOpts }}" as="o" hint-placeholder-count="6"><option value="{{ o }}">{{ o }}</option></sc-for>
+        </select>
+      </div>
+      <div style="flex:0 1 170px">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600;margin-bottom:7px">Tipo</div>
+        <select value="{{ fTipo }}" onChange="{{ setFTipo }}" style="width:100%;background:#0E1422;border:1px solid rgba(59,169,255,.2);color:#E4EAF3;font-size:13px;padding:10px 12px;border-radius:10px;font-family:inherit;cursor:pointer;outline:none">
+          <sc-for list="{{ tipoOpts }}" as="o" hint-placeholder-count="4"><option value="{{ o }}">{{ o }}</option></sc-for>
+        </select>
+      </div>
+      <div style="flex:0 1 200px">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600;margin-bottom:7px">Vendedor</div>
+        <select value="{{ fVend }}" onChange="{{ setFVend }}" style="width:100%;background:#0E1422;border:1px solid rgba(59,169,255,.2);color:#E4EAF3;font-size:13px;padding:10px 12px;border-radius:10px;font-family:inherit;cursor:pointer;outline:none">
+          <sc-for list="{{ vendOpts }}" as="o" hint-placeholder-count="8"><option value="{{ o }}">{{ o }}</option></sc-for>
+        </select>
+      </div>
+      <sc-if value="{{ temFiltro }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ limpar }}" style="background:none;border:none;color:#6B7385;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px;padding-bottom:10px">limpar</button>
+      </sc-if>
+    </div>
+
+    <!-- KPIs -->
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6">
+        <div style="position:relative;overflow:hidden;background:linear-gradient(155deg,rgba(59,169,255,.09),rgba(0,212,255,.025));border:1px solid rgba(59,169,255,.16);border-radius:14px;padding:15px 16px;min-height:104px;display:flex;flex-direction:column;justify-content:space-between">
+          <div style="position:absolute;top:0;left:0;right:0;height:3px;background:{{ k.color }}"></div>
+          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;font-weight:600">{{ k.label }}</div>
+          <div>
+            <div style="font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1;color:{{ k.color }};font-variant-numeric:tabular-nums">{{ k.value }}</div>
+            <div style="font-size:10.5px;color:#5E6678;margin-top:5px">{{ k.sub }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- timeline -->
+    <div style="background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px;margin-bottom:16px">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:14px">📈 Pedidos por dia</div>
+      <div style="display:flex;align-items:flex-end;gap:3px;height:120px">
+        <sc-for list="{{ dayBars }}" as="d" hint-placeholder-count="30">
+          <div style="flex:1;height:{{ d.h }}%;background:linear-gradient(180deg,#3BA9FF,#1B4F9E);border-radius:3px 3px 0 0;min-height:2px" title="{{ d.label }}"></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:9.5px;color:#5A6275"><span>{{ dayFirst }}</span><span>hoje</span></div>
+    </div>
+
+    <!-- status + tipo -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch">
+      <div style="flex:1 1 420px;min-width:380px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:16px">Pedidos por status</div>
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <sc-for list="{{ statusBars }}" as="s" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:100px 1fr 50px;gap:11px;align-items:center">
+              <div style="font-size:12px;color:#AEB6C6;font-weight:500;display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:{{ s.cor }}"></span>{{ s.label }}</div>
+              <div style="height:18px;background:rgba(255,255,255,.04);border-radius:6px;overflow:hidden"><div style="height:100%;width:{{ s.w }}%;background:{{ s.cor }};border-radius:6px;min-width:3px"></div></div>
+              <div style="font-size:12.5px;color:#D7DEEA;font-weight:700;text-align:right;font-variant-numeric:tabular-nums">{{ s.count }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="flex:1 1 300px;min-width:280px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:14px">Distribuição por tipo</div>
+        <div style="display:flex;align-items:center;gap:20px">
+          <div style="width:130px;height:130px;border-radius:50%;background:{{ tipoDonut }};flex-shrink:0;display:flex;align-items:center;justify-content:center">
+            <div style="width:78px;height:78px;border-radius:50%;background:#0B1018;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <div style="font-size:18px;font-weight:800;color:#F2F6FC;font-variant-numeric:tabular-nums">{{ filtradosN }}</div>
+              <div style="font-size:9px;color:#5E6678">pedidos</div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ tipoLegend }}" as="t" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="width:10px;height:10px;border-radius:3px;background:{{ t.cor }};flex-shrink:0"></span>
+                <span style="font-size:12px;color:#AEB6C6;flex:1">{{ t.label }}</span>
+                <span style="font-size:11.5px;color:#8B92A5;font-variant-numeric:tabular-nums">{{ t.pct }}%</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- table -->
+    <div style="background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700">Lista de pedidos</div>
+        <div style="font-size:11px;color:#5E6678">exibindo <b style="color:#9AA3B4">{{ filtradosN }}</b> de {{ totalN }} pedidos</div>
+      </div>
+      <div style="display:grid;grid-template-columns:70px 110px minmax(120px,1fr) minmax(120px,1fr) 120px 110px 110px;padding:0 6px 9px;border-bottom:1px solid rgba(255,255,255,.08);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6B7385;font-weight:700">
+        <div>Pedido</div><div>Data</div><div>Cliente</div><div>Vendedor</div><div>Tipo</div><div>Status</div><div style="text-align:right">Valor</div>
+      </div>
+      <div style="max-height:380px;overflow-y:auto">
+        <sc-for list="{{ pedRows }}" as="p" hint-placeholder-count="14">
+          <div style="display:grid;grid-template-columns:70px 110px minmax(120px,1fr) minmax(120px,1fr) 120px 110px 110px;padding:9px 6px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums">
+            <div style="color:#9CC6FF;font-weight:700">#{{ p.id }}</div>
+            <div style="color:#9AA3B4">{{ p.data }}</div>
+            <div style="color:#D7DEEA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">{{ p.cliente }}</div>
+            <div style="color:#9AA3B4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">{{ p.vendedor }}</div>
+            <div><span style="font-size:10.5px;font-weight:600;color:{{ p.tipoCor }};background:{{ p.tipoBg }};padding:3px 9px;border-radius:6px">{{ p.tipo }}</span></div>
+            <div><span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:{{ p.cor }};background:{{ p.bg }};padding:3px 9px;border-radius:20px"><span style="width:6px;height:6px;border-radius:50%;background:{{ p.cor }}"></span>{{ p.status }}</span></div>
+            <div style="text-align:right;color:#D7DEEA;font-weight:600">{{ p.valorLabel }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ vazio }}" hint-placeholder-val="{{ false }}">
+        <div style="text-align:center;color:#5E6678;font-size:13px;padding:30px 0">Nenhum pedido encontrado com esses filtros.</div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ===== BUSCAR PEDIDO ===== -->
+  <sc-if value="{{ tabBuscar }}" hint-placeholder-val="{{ false }}">
+    <div style="background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px;margin-bottom:16px;max-width:420px">
+      <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600;margin-bottom:8px">Número do pedido</div>
+      <input value="{{ buscaId }}" onChange="{{ setBuscaId }}" placeholder="Ex: 2456" style="width:100%;background:#0E1422;border:1px solid rgba(59,169,255,.2);color:#E4EAF3;font-size:15px;font-weight:600;padding:11px 14px;border-radius:10px;font-family:inherit;outline:none">
+    </div>
+    <sc-if value="{{ achou }}" hint-placeholder-val="{{ false }}">
+      <div style="background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:20px 22px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <div style="font-size:19px;font-weight:800;color:#F2F6FC">Pedido #{{ ped.id }}</div>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:{{ ped.cor }};background:{{ ped.bg }};padding:5px 13px;border-radius:20px"><span style="width:7px;height:7px;border-radius:50%;background:{{ ped.cor }}"></span>{{ ped.status }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+          <sc-for list="{{ pedMeta }}" as="m" hint-placeholder-count="4">
+            <div style="background:rgba(255,255,255,.03);border-radius:11px;padding:13px 15px">
+              <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6B7385;font-weight:600">{{ m.label }}</div>
+              <div style="font-size:16px;font-weight:700;color:#E4EAF3;margin-top:5px;font-variant-numeric:tabular-nums">{{ m.value }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:12px">Itens do pedido</div>
+        <div style="display:grid;grid-template-columns:minmax(150px,1fr) 80px 110px 110px;padding:0 6px 9px;border-bottom:1px solid rgba(255,255,255,.08);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6B7385;font-weight:700">
+          <div>Produto</div><div style="text-align:right">Qtd</div><div style="text-align:right">Unitário</div><div style="text-align:right">Total</div>
+        </div>
+        <sc-for list="{{ pedItens }}" as="it" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:minmax(150px,1fr) 80px 110px 110px;padding:9px 6px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums">
+            <div style="color:#D7DEEA">{{ it.produto }}</div>
+            <div style="text-align:right;color:#9AA3B4">{{ it.qtd }}</div>
+            <div style="text-align:right;color:#9AA3B4">{{ it.unit }}</div>
+            <div style="text-align:right;color:#D7DEEA;font-weight:600">{{ it.total }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ naoAchou }}" hint-placeholder-val="{{ false }}">
+      <div style="background:rgba(255,138,76,.06);border:1px solid rgba(255,138,76,.25);border-radius:14px;padding:16px 20px;font-size:13px;color:#FFB38A">Pedido <b>#{{ buscaId }}</b> não encontrado. Tente um ID entre 2400 e 2530.</div>
+    </sc-if>
+    <sc-if value="{{ semBusca }}" hint-placeholder-val="{{ true }}">
+      <div style="color:#5E6678;font-size:13px;padding:8px 2px">Digite o número de um pedido acima para ver os detalhes e itens.</div>
+    </sc-if>
+  </sc-if>
+
+  <!-- ===== AJUSTE ===== -->
+  <sc-if value="{{ tabAjuste }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      <sc-for list="{{ ajusteKpis }}" as="k" hint-placeholder-count="4">
+        <div style="position:relative;overflow:hidden;background:linear-gradient(155deg,rgba(59,169,255,.09),rgba(0,212,255,.025));border:1px solid rgba(59,169,255,.16);border-radius:14px;padding:15px 16px;min-height:100px;display:flex;flex-direction:column;justify-content:space-between">
+          <div style="position:absolute;top:0;left:0;right:0;height:3px;background:{{ k.color }}"></div>
+          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;font-weight:600">{{ k.label }}</div>
+          <div style="font-size:26px;font-weight:800;color:{{ k.color }};line-height:1;font-variant-numeric:tabular-nums">{{ k.value }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:13px">Contagens de estoque</div>
+      <div style="display:grid;grid-template-columns:70px 110px minmax(180px,1fr) 110px 120px 110px;padding:0 6px 9px;border-bottom:1px solid rgba(255,255,255,.08);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6B7385;font-weight:700">
+        <div>ID</div><div>Data</div><div>Observação</div><div style="text-align:right">Itens</div><div style="text-align:right">Divergências</div><div style="text-align:right">Saldo</div>
+      </div>
+      <sc-for list="{{ contagens }}" as="c" hint-placeholder-count="8">
+        <div style="display:grid;grid-template-columns:70px 110px minmax(180px,1fr) 110px 120px 110px;padding:10px 6px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums">
+          <div style="color:#9CC6FF;font-weight:700">#{{ c.id }}</div>
+          <div style="color:#9AA3B4">{{ c.data }}</div>
+          <div style="color:#D7DEEA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">{{ c.obs }}</div>
+          <div style="text-align:right;color:#9AA3B4">{{ c.itens }}</div>
+          <div style="text-align:right;color:{{ c.divCor }};font-weight:600">{{ c.div }}</div>
+          <div style="text-align:right;font-weight:700;color:{{ c.saldoCor }}">{{ c.saldoLabel }}</div>
+        </div>
+      </sc-for>
+      <div style="font-size:10.5px;color:#5E6678;margin-top:12px">Saldo de ajuste = sobras (físico &gt; sistema) menos faltas · <span style="color:#00E0A1">verde = positivo</span> · <span style="color:#FF5C6C">vermelho = negativo</span></div>
+    </div>
+  </sc-if>
+
+  <div style="font-size:10.5px;color:#454C5C;margin-top:18px;line-height:1.6">Movimentação de pedidos PRE-VENDA, BRINDE e REPOSIÇÃO · <span style="color:#3BA9FF">dados de demonstração — conecte ao banco para valores reais</span></div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1024}}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.statusMeta = {
+      'Faturado':  {cor:'#00E0A1', bg:'rgba(0,224,161,.12)'},
+      'Entregue':  {cor:'#3BA9FF', bg:'rgba(59,169,255,.12)'},
+      'Separação': {cor:'#FFC53D', bg:'rgba(255,197,61,.12)'},
+      'Pendente':  {cor:'#FF8A4C', bg:'rgba(255,138,76,.12)'},
+      'Cancelado': {cor:'#FF5C6C', bg:'rgba(255,92,108,.12)'},
+    };
+    this.tipoMeta = {
+      'PRE-VENDA': {cor:'#3BA9FF', bg:'rgba(59,169,255,.12)'},
+      'BRINDE':    {cor:'#FFC53D', bg:'rgba(255,197,61,.12)'},
+      'REPOSICAO': {cor:'#00E0A1', bg:'rgba(0,224,161,.12)'},
+    };
+    this.vendNomes = ['Carlos Andrade','Fernanda Lima','Roberto Souza','Patrícia Gomes','Marcos Vieira','Juliana Costa','André Ribeiro','Camila Duarte'];
+    this.prodNames = ['Detergente Neutro 500ml','Café Torrado 500g','Arroz Tipo 1 5kg','Óleo de Soja 900ml','Leite Integral 1L','Sabão em Pó 1kg','Açúcar Refinado 1kg','Macarrão 500g','Biscoito Recheado','Refrigerante 2L','Margarina 500g','Feijão Carioca 1kg'];
+    this.pedidos = this.buildPedidos();
+    this.contagensData = this.buildContagens();
+    this.state = { tab:'mov', fBusca:'', fStatus:'Todos', fTipo:'Todos', fVend:'Todos', buscaId:'' };
+  }
+
+  buildPedidos(){
+    let s = 555777999>>>0;
+    const rng = ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+    const clientes = ['Mercado São José','Padaria Pão Dourado','Supermercado Líder','Mercearia Central','Atacadão Vale','Empório do Bairro','Minimercado Bela Vista','Comercial Ávila','Distrib. Norte','Casa das Compras','Mercado Bom Preço','Armazém Santa Rita'];
+    const statuses = ['Faturado','Faturado','Entregue','Entregue','Separação','Pendente','Cancelado'];
+    const tipos = ['PRE-VENDA','PRE-VENDA','PRE-VENDA','REPOSICAO','BRINDE'];
+    const today = new Date(2026,5,17);
+    const out = [];
+    for(let i=0;i<130;i++){
+      const id = 2400+i;
+      const diasAtras = Math.floor(rng()*35);
+      const d = new Date(today); d.setDate(d.getDate()-diasAtras);
+      const data = ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
+      const status = statuses[Math.floor(rng()*statuses.length)];
+      const tipo = tipos[Math.floor(rng()*tipos.length)];
+      const cliente = clientes[Math.floor(rng()*clientes.length)];
+      const vendedor = this.vendNomes[Math.floor(rng()*this.vendNomes.length)];
+      const valor = tipo==='BRINDE' ? Math.round(rng()*180+20) : Math.round(rng()*3200+150);
+      out.push({id, diasAtras, data, status, tipo, cliente, vendedor, valor, _seed:id*7919});
+    }
+    return out;
+  }
+
+  buildContagens(){
+    let s = 333222111>>>0;
+    const rng = ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+    const obs = ['Contagem mensal geral','Ajuste setor limpeza','Conferência alimentos','Inventário rotativo','Recontagem divergências','Contagem fim de mês','Auditoria fornecedor','Ajuste pós-entrega'];
+    const today = new Date(2026,5,17);
+    return obs.map((o,i)=>{
+      const d=new Date(today); d.setDate(d.getDate()-Math.floor(rng()*60));
+      const itens = Math.round(rng()*180+30);
+      const div = Math.round(rng()*itens*0.25);
+      const saldo = Math.round((rng()-0.5)*div*4);
+      return {id:120+i, data:('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear(), obs:o, itens, div, saldo};
+    });
+  }
+
+  brl(v){ return 'R$ '+Math.round(v).toLocaleString('pt-BR'); }
+  brlc(v){ if(v>=1e6) return 'R$ '+(v/1e6).toFixed(2).replace('.',',')+'M'; if(v>=1000) return 'R$ '+(v/1000).toFixed(1).replace('.',',')+'k'; return 'R$ '+Math.round(v); }
+
+  buildItens(ped){
+    let s = ped._seed>>>0;
+    const rng = ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+    const n = 2+Math.floor(rng()*4);
+    const used = new Set();
+    const items = [];
+    let total=0;
+    for(let i=0;i<n;i++){
+      let idx=Math.floor(rng()*this.prodNames.length);
+      while(used.has(idx)) idx=(idx+1)%this.prodNames.length;
+      used.add(idx);
+      const qtd = 1+Math.floor(rng()*40);
+      const unit = Math.round((rng()*30+2)*100)/100;
+      const t = qtd*unit; total+=t;
+      items.push({produto:this.prodNames[idx], qtd, unit:this.brl(unit), total:this.brl(t)});
+    }
+    return {items, total};
+  }
+
+  renderVals(){
+    const {tab, fBusca, fStatus, fTipo, fVend, buscaId} = this.state;
+    const peds = this.pedidos;
+
+    // filters
+    let f = peds;
+    if(fBusca){ const q=fBusca.toLowerCase(); f=f.filter(p=>String(p.id).includes(q)||p.cliente.toLowerCase().includes(q)||p.vendedor.toLowerCase().includes(q)); }
+    if(fStatus!=='Todos') f=f.filter(p=>p.status===fStatus);
+    if(fTipo!=='Todos') f=f.filter(p=>p.tipo===fTipo);
+    if(fVend!=='Todos') f=f.filter(p=>p.vendedor===fVend);
+
+    const valorTotal = f.reduce((s,p)=>s+p.valor,0);
+    const cancel = f.filter(p=>p.status==='Cancelado').length;
+    const sep = f.filter(p=>p.status==='Separação').length;
+    const pend = f.filter(p=>p.status==='Pendente').length;
+    const ticket = f.length? valorTotal/f.length : 0;
+    const kpis = [
+      {label:'Total de pedidos', value:String(f.length), sub:'no filtro atual', color:'#3BA9FF'},
+      {label:'Valor total', value:this.brlc(valorTotal), sub:'soma dos pedidos', color:'#00E0A1'},
+      {label:'Ticket médio', value:this.brl(ticket), sub:'valor ÷ pedidos', color:'#22D3EE'},
+      {label:'Cancelados', value:String(cancel), sub:'fora do faturamento', color:'#FF5C6C'},
+      {label:'Em separação', value:String(sep), sub:'aguardando expedição', color:'#FFC53D'},
+      {label:'Pendentes', value:String(pend), sub:'a confirmar', color:'#FF8A4C'},
+    ];
+
+    // timeline (30 dias)
+    const days = [];
+    for(let dd=29;dd>=0;dd--){ const cnt=f.filter(p=>p.diasAtras===dd).length; days.push(cnt); }
+    const maxD = Math.max(1,...days);
+    const dayBars = days.map((c,i)=>({h:c/maxD*100, label:c+' pedidos'}));
+
+    // status bars
+    const order=['Faturado','Entregue','Separação','Pendente','Cancelado'];
+    const maxS = Math.max(1,...order.map(st=>f.filter(p=>p.status===st).length));
+    const statusBars = order.map(st=>{ const c=f.filter(p=>p.status===st).length; return {label:st, count:c, w:c/maxS*100, cor:this.statusMeta[st].cor}; });
+
+    // tipo donut
+    const tipoOrder=['PRE-VENDA','REPOSICAO','BRINDE'];
+    const tipoCounts = tipoOrder.map(t=>({t, c:f.filter(p=>p.tipo===t).length}));
+    const totT = f.length||1;
+    let acc=0; const segs=[];
+    tipoCounts.forEach(tc=>{ const a=acc,b=acc+tc.c/totT*100; segs.push(this.tipoMeta[tc.t].cor+' '+a.toFixed(1)+'% '+b.toFixed(1)+'%'); acc=b; });
+    const tipoDonut='conic-gradient('+segs.join(',')+')';
+    const tipoLegend = tipoCounts.map(tc=>({label:tc.t, cor:this.tipoMeta[tc.t].cor, pct:(tc.c/totT*100).toFixed(0)}));
+
+    // table
+    const pedRows = [...f].sort((a,b)=>b.id-a.id).map(p=>{ const m=this.statusMeta[p.status], tm=this.tipoMeta[p.tipo]; return {id:p.id, data:p.data, cliente:p.cliente, vendedor:p.vendedor, tipo:p.tipo, tipoCor:tm.cor, tipoBg:tm.bg, status:p.status, cor:m.cor, bg:m.bg, valorLabel:this.brl(p.valor)}; });
+
+    // buscar pedido
+    let achou=false, naoAchou=false, semBusca=true, ped=null, pedMeta=[], pedItens=[];
+    if(buscaId && buscaId.trim()){
+      semBusca=false;
+      const match = peds.find(p=>String(p.id)===buscaId.trim());
+      if(match){
+        achou=true; const m=this.statusMeta[match.status];
+        const it=this.buildItens(match);
+        ped={id:match.id, status:match.status, cor:m.cor, bg:m.bg};
+        pedMeta=[
+          {label:'Tipo', value:match.tipo},
+          {label:'Data', value:match.data},
+          {label:'Valor', value:this.brl(it.total)},
+          {label:'Vendedor', value:match.vendedor.split(' ')[0]},
+        ];
+        pedItens=it.items;
+      } else naoAchou=true;
+    }
+
+    // ajuste
+    const totItens=this.contagensData.reduce((s,c)=>s+c.itens,0);
+    const totDiv=this.contagensData.reduce((s,c)=>s+c.div,0);
+    const totSaldo=this.contagensData.reduce((s,c)=>s+c.saldo,0);
+    const ajusteKpis=[
+      {label:'Contagens', value:String(this.contagensData.length), color:'#3BA9FF'},
+      {label:'Total de itens', value:totItens.toLocaleString('pt-BR'), color:'#22D3EE'},
+      {label:'Divergências', value:totDiv.toLocaleString('pt-BR'), color:'#FFC53D'},
+      {label:'Saldo de ajuste', value:(totSaldo>=0?'+':'')+totSaldo.toLocaleString('pt-BR')+' un', color: totSaldo>=0?'#00E0A1':'#FF5C6C'},
+    ];
+    const contagens=this.contagensData.map(c=>({id:c.id, data:c.data, obs:c.obs, itens:c.itens, div:c.div, divCor:c.div>0?'#FFC53D':'#9AA3B4', saldoLabel:(c.saldo>=0?'+':'')+c.saldo, saldoCor:c.saldo>0?'#00E0A1':(c.saldo<0?'#FF5C6C':'#9AA3B4')}));
+
+    return {
+      tabs:[{k:'mov',l:'📊 Movimentação'},{k:'buscar',l:'🔍 Buscar Pedido'},{k:'ajuste',l:'📦 Ajuste de Estoque'}].map(t=>({label:t.l, bg: tab===t.k?'rgba(59,169,255,.16)':'transparent', fg: tab===t.k?'#9CC6FF':'#7B8499', onClick:()=>this.setState({tab:t.k})})),
+      tabMov:tab==='mov', tabBuscar:tab==='buscar', tabAjuste:tab==='ajuste',
+      fBusca, setFBusca:(e)=>this.setState({fBusca:e.target.value}),
+      fStatus, setFStatus:(e)=>this.setState({fStatus:e.target.value}), statusOpts:['Todos',...order],
+      fTipo, setFTipo:(e)=>this.setState({fTipo:e.target.value}), tipoOpts:['Todos',...tipoOrder],
+      fVend, setFVend:(e)=>this.setState({fVend:e.target.value}), vendOpts:['Todos',...this.vendNomes],
+      temFiltro: !!(fBusca||fStatus!=='Todos'||fTipo!=='Todos'||fVend!=='Todos'),
+      limpar:()=>this.setState({fBusca:'',fStatus:'Todos',fTipo:'Todos',fVend:'Todos'}),
+      kpis, dayBars, dayFirst:'35 dias atrás', statusBars, tipoDonut, tipoLegend,
+      pedRows, filtradosN:f.length, totalN:peds.length, vazio:f.length===0,
+      buscaId, setBuscaId:(e)=>this.setState({buscaId:e.target.value}),
+      achou, naoAchou, semBusca, ped, pedMeta, pedItens,
+      ajusteKpis, contagens,
+    };
+  }
+}
+</script>
+</body>
+</html>

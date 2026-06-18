@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070B12;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(59,169,255,.22);border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(59,169,255,.4)}
+  ::placeholder{color:#4A5365}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:radial-gradient(1200px 600px at 80% -10%,rgba(46,124,246,.10),transparent 60%),#070B12;color:#D7DEEA;padding:26px 30px 40px;font-family:Inter,sans-serif">
+<div style="max-width:1400px;margin:0 auto">
+
+  <!-- HEADER -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,#2E7CF6,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:23px;box-shadow:0 6px 20px rgba(46,124,246,.35)">📊</div>
+      <div>
+        <div style="font-size:21px;font-weight:800;letter-spacing:-.02em;color:#F2F6FC">Dashboard de Vendas — SGV</div>
+        <div style="font-size:12px;color:#6B7385;font-weight:500;margin-top:2px">Rotas, vendedores e produtos · pedidos PRE-VENDA válidos</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="text-align:right;font-size:11px;color:#5A6275;line-height:1.5">
+        <div>Atualizado em <span style="color:#8B92A5">17/06/2026 14:32</span></div>
+        <div>período: {{ presetLabel }} · cache 10 min</div>
+      </div>
+      <button onClick="{{ recarregar }}" style="display:flex;align-items:center;gap:7px;background:rgba(59,169,255,.10);border:1px solid rgba(59,169,255,.28);color:#9CC6FF;font-size:12px;font-weight:600;padding:9px 14px;border-radius:10px;cursor:pointer;font-family:inherit">↻ Recarregar</button>
+    </div>
+  </div>
+
+  <!-- PERIOD FILTER -->
+  <div style="background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600">Período</span>
+    <div style="display:flex;gap:5px;background:#0E1422;border:1px solid rgba(59,169,255,.2);padding:4px;border-radius:11px">
+      <sc-for list="{{ presets }}" as="p" hint-placeholder-count="4">
+        <button onClick="{{ p.onClick }}" style="border:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 16px;border-radius:8px;background:{{ p.bg }};color:{{ p.fg }};transition:all .15s">{{ p.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6">
+      <div style="position:relative;overflow:hidden;background:linear-gradient(155deg,rgba(59,169,255,.09),rgba(0,212,255,.025));border:1px solid rgba(59,169,255,.16);border-radius:14px;padding:15px 16px;min-height:106px;display:flex;flex-direction:column;justify-content:space-between">
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:{{ k.color }}"></div>
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;font-weight:600;line-height:1.3">{{ k.label }}</div>
+        <div>
+          <div style="font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1;color:{{ k.color }};font-variant-numeric:tabular-nums">{{ k.value }}</div>
+          <div style="font-size:10.5px;color:#5E6678;margin-top:5px;line-height:1.3">{{ k.sub }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- TABS -->
+  <div style="display:flex;gap:5px;background:rgba(255,255,255,.03);padding:5px;border-radius:12px;margin-bottom:16px;width:max-content">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <button onClick="{{ t.onClick }}" style="border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:9px 18px;border-radius:9px;background:{{ t.bg }};color:{{ t.fg }};transition:all .15s">{{ t.label }}</button>
+    </sc-for>
+  </div>
+
+  <!-- ===== ROTAS ===== -->
+  <sc-if value="{{ tabRotas }}" hint-placeholder-val="{{ true }}">
+    <div style="background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px;margin-bottom:16px">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:3px">📈 Tendência semanal — faturamento</div>
+      <div style="font-size:11px;color:#5E6678;margin-bottom:14px">Últimas 12 semanas · {{ presetLabel }}</div>
+      <div style="position:relative;height:170px">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible">
+          <defs><linearGradient id="trendg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3BA9FF" stop-opacity=".28"></stop><stop offset="100%" stop-color="#3BA9FF" stop-opacity="0"></stop></linearGradient></defs>
+          <path d="{{ trendArea }}" fill="url(#trendg)"></path>
+          <polyline points="{{ trendPts }}" fill="none" stroke="#22D3EE" stroke-width="1.8" vector-effect="non-scaling-stroke"></polyline>
+        </svg>
+        <sc-for list="{{ trendDots }}" as="d" hint-placeholder-count="12">
+          <div style="position:absolute;left:{{ d.x }}%;top:{{ d.y }}%;width:6px;height:6px;border-radius:50%;background:#22D3EE;transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(34,211,238,.18)"></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:9.5px;color:#5A6275"><span>{{ trendFirst }}</span><span>{{ trendLast }}</span></div>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+      <div style="flex:1 1 380px;min-width:340px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:14px">Top rotas — faturamento semanal</div>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <sc-for list="{{ rotaBars }}" as="r" hint-placeholder-count="10">
+            <div style="display:grid;grid-template-columns:130px 1fr;gap:11px;align-items:center">
+              <div style="font-size:11.5px;color:#AEB6C6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.nome }}</div>
+              <div style="position:relative;height:22px;background:rgba(255,255,255,.04);border-radius:7px;overflow:hidden">
+                <div style="position:absolute;left:0;top:0;bottom:0;width:{{ r.w }}%;background:linear-gradient(90deg,#2E7CF6,#00D4FF);border-radius:7px;min-width:3px"></div>
+                <div style="position:absolute;left:calc({{ r.w }}% + 7px);top:50%;transform:translateY(-50%);font-size:10.5px;font-weight:700;color:#C4CCDA;font-variant-numeric:tabular-nums">{{ r.label }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="flex:1 1 480px;min-width:420px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:13px">Detalhe por rota</div>
+        <div style="display:grid;grid-template-columns:minmax(130px,1fr) 90px 110px 100px 80px;padding:0 6px 9px;border-bottom:1px solid rgba(255,255,255,.08);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6B7385;font-weight:700">
+          <div>Rota</div><div style="text-align:right">Ped/Sem</div><div style="text-align:right">Fat/Sem</div><div style="text-align:right">Ticket</div><div style="text-align:right">Nível</div>
+        </div>
+        <div style="max-height:300px;overflow-y:auto">
+          <sc-for list="{{ rotaRows }}" as="r" hint-placeholder-count="12">
+            <div style="display:grid;grid-template-columns:minmax(130px,1fr) 90px 110px 100px 80px;padding:9px 6px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums">
+              <div style="color:#D7DEEA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px">{{ r.nome }}</div>
+              <div style="text-align:right;color:#9AA3B4">{{ r.pedLabel }}</div>
+              <div style="text-align:right;color:#D7DEEA;font-weight:600">{{ r.fatLabel }}</div>
+              <div style="text-align:right;color:#9AA3B4">{{ r.ticketLabel }}</div>
+              <div style="text-align:right"><span style="font-size:10.5px;font-weight:600;color:{{ r.nivelCor }};background:{{ r.nivelBg }};padding:3px 9px;border-radius:20px">{{ r.nivel }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== VENDEDORES ===== -->
+  <sc-if value="{{ tabVend }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;gap:14px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+      <div style="flex:0 1 220px">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600;margin-bottom:7px">📍 Estado</div>
+        <select value="{{ vendEstado }}" onChange="{{ setVendEstado }}" style="width:100%;background:#0E1422;border:1px solid rgba(59,169,255,.2);color:#E4EAF3;font-size:13px;font-weight:500;padding:10px 12px;border-radius:10px;font-family:inherit;cursor:pointer;outline:none">
+          <sc-for list="{{ estadoOpts }}" as="e" hint-placeholder-count="7"><option value="{{ e }}">{{ e }}</option></sc-for>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+      <div style="flex:1 1 540px;min-width:480px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px;overflow-x:auto">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:14px">🗺️ Faturamento por vendedor × estado</div>
+        <div style="display:grid;grid-template-columns:140px repeat({{ nEstados }},1fr);gap:4px;min-width:520px">
+          <div></div>
+          <sc-for list="{{ estadosHead }}" as="e" hint-placeholder-count="6"><div style="text-align:center;font-size:11px;font-weight:700;color:#8B92A5;padding-bottom:4px">{{ e }}</div></sc-for>
+          <sc-for list="{{ heatRows }}" as="row" hint-placeholder-count="10">
+            <div style="font-size:11.5px;color:#AEB6C6;font-weight:500;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px">{{ row.nome }}</div>
+            <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="6">
+              <div style="aspect-ratio:1.7;border-radius:5px;background:{{ c.bg }};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:{{ c.fg }}">{{ c.label }}</div>
+            </sc-for>
+          </sc-for>
+        </div>
+      </div>
+      <div style="flex:1 1 360px;min-width:320px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:13px">Ranking de vendedores</div>
+        <div style="max-height:380px;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ vendRanking }}" as="v" hint-placeholder-count="10">
+            <div style="display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.03);border-radius:10px;padding:10px 12px">
+              <div style="width:24px;height:24px;border-radius:7px;background:{{ v.posBg }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:{{ v.posFg }};flex-shrink:0">{{ v.pos }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;color:#E4EAF3;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.nome }}</div>
+                <div style="font-size:10.5px;color:#5E6678;margin-top:2px">{{ v.ped }} pedidos · {{ v.cli }} clientes · {{ v.estado }}</div>
+              </div>
+              <div style="font-size:13px;font-weight:700;color:#9CC6FF;font-variant-numeric:tabular-nums;flex-shrink:0">{{ v.fatLabel }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== PRODUTOS ===== -->
+  <sc-if value="{{ tabProd }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;gap:14px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+      <div style="flex:1 1 280px;min-width:240px">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600;margin-bottom:7px">Buscar produto</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.5">🔍</span>
+          <input value="{{ prodBusca }}" onChange="{{ setProdBusca }}" placeholder="Nome do produto..." style="width:100%;background:#0E1422;border:1px solid rgba(59,169,255,.2);color:#E4EAF3;font-size:13px;padding:10px 12px 10px 34px;border-radius:10px;font-family:inherit;outline:none">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#6B7385;font-weight:600;margin-bottom:7px">Ranking por</div>
+        <div style="display:flex;gap:4px;background:#0E1422;border:1px solid rgba(59,169,255,.2);padding:4px;border-radius:11px">
+          <sc-for list="{{ metricaBtns }}" as="m" hint-placeholder-count="2">
+            <button onClick="{{ m.onClick }}" style="border:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 16px;border-radius:8px;background:{{ m.bg }};color:{{ m.fg }};transition:all .15s">{{ m.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+      <div style="flex:1 1 380px;min-width:340px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:14px">Top 15 produtos — {{ metricaLabel }}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ prodBars }}" as="p" hint-placeholder-count="15">
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:11px;align-items:center">
+              <div style="font-size:11.5px;color:#AEB6C6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ p.produto }}">{{ p.short }}</div>
+              <div style="position:relative;height:20px;background:rgba(255,255,255,.04);border-radius:6px;overflow:hidden">
+                <div style="position:absolute;left:0;top:0;bottom:0;width:{{ p.w }}%;background:linear-gradient(90deg,#00E0A1,#22D3EE);border-radius:6px;min-width:3px"></div>
+                <div style="position:absolute;left:calc({{ p.w }}% + 7px);top:50%;transform:translateY(-50%);font-size:10.5px;font-weight:700;color:#C4CCDA;font-variant-numeric:tabular-nums">{{ p.label }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="flex:1 1 480px;min-width:420px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:13px">
+          <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700">Ranking completo</div>
+          <div style="font-size:11px;color:#5E6678">{{ prodCount }} produtos</div>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(150px,1fr) 80px 80px 110px;padding:0 6px 9px;border-bottom:1px solid rgba(255,255,255,.08);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#6B7385;font-weight:700">
+          <div>Produto</div><div style="text-align:right">Qtd</div><div style="text-align:right">Pedidos</div><div style="text-align:right">Faturamento</div>
+        </div>
+        <div style="max-height:340px;overflow-y:auto">
+          <sc-for list="{{ prodRows }}" as="p" hint-placeholder-count="12">
+            <div style="display:grid;grid-template-columns:minmax(150px,1fr) 80px 80px 110px;padding:9px 6px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums">
+              <div style="color:#D7DEEA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px" title="{{ p.produto }}">{{ p.short }}</div>
+              <div style="text-align:right;color:#9AA3B4">{{ p.qtdLabel }}</div>
+              <div style="text-align:right;color:#9AA3B4">{{ p.pedidos }}</div>
+              <div style="text-align:right;color:#D7DEEA;font-weight:600">{{ p.fatLabel }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== FAIXA ETÁRIA ===== -->
+  <sc-if value="{{ tabFaixa }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+      <div style="flex:1 1 520px;min-width:460px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:20px">Ticket médio &amp; faturamento por faixa etária</div>
+        <div style="display:flex;align-items:flex-end;gap:14px;height:260px">
+          <sc-for list="{{ faixaBars }}" as="f" hint-placeholder-count="6">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
+              <div style="font-size:11px;color:#C4CCDA;font-weight:700;margin-bottom:6px">{{ f.fatLabel }}</div>
+              <div style="width:100%;display:flex;gap:4px;align-items:flex-end;height:78%">
+                <div style="flex:1;height:{{ f.hFat }}%;background:linear-gradient(180deg,#2E7CF6,#1B4F9E);border-radius:5px 5px 0 0;min-height:3px"></div>
+                <div style="flex:1;height:{{ f.hTicket }}%;background:linear-gradient(180deg,#00E0A1,#0A8A63);border-radius:5px 5px 0 0;min-height:3px"></div>
+              </div>
+              <div style="font-size:10.5px;color:#8B92A5;margin-top:8px;font-weight:600">{{ f.faixa }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)">
+          <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8B92A5"><span style="width:9px;height:9px;border-radius:2px;background:#2E7CF6"></span>Faturamento</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8B92A5"><span style="width:9px;height:9px;border-radius:2px;background:#00E0A1"></span>Ticket médio</span>
+        </div>
+      </div>
+      <div style="flex:1 1 320px;min-width:300px;background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700;margin-bottom:18px">Distribuição de clientes</div>
+        <div style="display:flex;align-items:center;justify-content:center;margin-bottom:18px">
+          <div style="width:180px;height:180px;border-radius:50%;background:{{ donutBg }};display:flex;align-items:center;justify-content:center">
+            <div style="width:108px;height:108px;border-radius:50%;background:#0B1018;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <div style="font-size:22px;font-weight:800;color:#F2F6FC;font-variant-numeric:tabular-nums">{{ totalClientes }}</div>
+              <div style="font-size:10px;color:#5E6678">clientes</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ faixaLegend }}" as="f" hint-placeholder-count="6">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="width:10px;height:10px;border-radius:3px;background:{{ f.cor }};flex-shrink:0"></span>
+              <span style="font-size:12px;color:#AEB6C6;flex:1">{{ f.faixa }}</span>
+              <span style="font-size:11.5px;color:#8B92A5;font-variant-numeric:tabular-nums">{{ f.pct }}%</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="font-size:10.5px;color:#454C5C;margin-top:18px;line-height:1.6">
+    Faturamento e pedidos PRE-VENDA válidos · ticket = faturamento ÷ pedidos · <span style="color:#3BA9FF">dados de demonstração — conecte ao banco para valores reais</span>
+  </div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1024}}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.estados = ['SP','MG','RJ','PR','BA','GO'];
+    this.data = this.buildData();
+    this.state = { preset:'Tudo', tab:'rotas', vendEstado:'Todos', prodBusca:'', prodMetrica:'Faturamento' };
+  }
+
+  buildData(){
+    let s = 246813579>>>0;
+    const rng = ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
+    // rotas
+    const regioes = ['Centro','Zona Norte','Zona Sul','Zona Leste','Zona Oeste','Interior I','Interior II','Litoral','Serra','Vale','Capital','Metropolitana','Sertão','Agreste','Planalto','Baixada','Triângulo','Campos'];
+    const rotas = regioes.map((nome,i)=>{
+      const fat_sem = Math.round((Math.pow(rng(),1.4)*42000+2500));
+      const ped_sem = Math.round(rng()*100+10);
+      return {nome:'R-'+('0'+(i+1)).slice(-2)+' '+nome, fat_sem, ped_sem, ticket: fat_sem/ped_sem};
+    });
+    // vendedores
+    const nomes = ['Carlos Andrade','Fernanda Lima','Roberto Souza','Patrícia Gomes','Marcos Vieira','Juliana Costa','André Ribeiro','Camila Duarte','Paulo Henrique','Sandra Mendes','Rafael Tavares','Beatriz Nunes'];
+    const vendedores = nomes.map((nome,i)=>{
+      const estado = this.estados[i % this.estados.length];
+      const fat = Math.round((Math.pow(rng(),1.3)*120000+8000));
+      const ped = Math.round(rng()*600+40);
+      const cli = Math.round(rng()*220+20);
+      const sec = rng()<0.35 ? this.estados[(i+2)%this.estados.length] : null;
+      return {nome, estado, fat, ped, cli, sec};
+    });
+    // produtos
+    const prodNames = ['Detergente Neutro 500ml','Sabão em Pó Brilho 1kg','Amaciante Floral 2L','Café Torrado 500g','Açúcar Refinado 1kg','Arroz Tipo 1 5kg','Feijão Carioca 1kg','Óleo de Soja 900ml','Macarrão Espaguete 500g','Leite Integral 1L','Refrigerante Cola 2L','Biscoito Recheado 130g','Margarina 500g','Maionese 500g','Molho de Tomate 340g','Achocolatado em Pó 400g','Sabonete Glicerinado 90g','Creme Dental 90g','Papel Higiênico Neve 12un','Desinfetante Pinho 2L','Água Sanitária 1L','Esponja Multiuso 3un','Farinha de Trigo 1kg','Leite Condensado 395g','Caldo de Carne 12un','Tempero Completo 300g','Vinagre 750ml','Sal Refinado 1kg','Suco Concentrado 500ml','Achocolatado Pronto 1L'];
+    const produtos = prodNames.map(nome=>{
+      const qtd = Math.round(Math.pow(rng(),1.5)*4000+50);
+      const preco = Math.round((rng()*25+2)*100)/100;
+      const pedidos = Math.round(rng()*400+10);
+      return {produto:nome, short: nome.length>26?nome.slice(0,25)+'…':nome, qtd, preco, pedidos, faturamento: Math.round(qtd*preco)};
+    });
+    // faixa etaria
+    const faixaDef = [['18–25',0.10],['26–35',0.24],['36–45',0.27],['46–55',0.21],['56–65',0.12],['65+',0.06]];
+    const totCli = 4200;
+    const cores = ['#2E7CF6','#00D4FF','#00E0A1','#FFC53D','#FF8A4C','#7B8BFF'];
+    const faixas = faixaDef.map((f,i)=>{
+      const clientes = Math.round(totCli*f[1]);
+      const ticket = Math.round((rng()*180+90));
+      return {faixa:f[0], clientes, ticket, faturamento: Math.round(clientes*ticket*(rng()*2+3)), cor:cores[i]};
+    });
+    // trend 12 semanas
+    let base = 70000;
+    const trend = [];
+    for(let i=0;i<12;i++){ base = base*(0.94+rng()*0.16); trend.push({sem:i, fat:Math.round(base)}); }
+    return {rotas, vendedores, produtos, faixas, trend};
+  }
+
+  brl(v){ if(v>=1e6) return 'R$ '+(v/1e6).toFixed(2).replace('.',',')+'M'; if(v>=1000) return 'R$ '+Math.round(v/1000)+'k'; return 'R$ '+Math.round(v); }
+  brlFull(v){ return 'R$ '+Math.round(v).toLocaleString('pt-BR'); }
+  num(v){ return Math.round(v).toLocaleString('pt-BR'); }
+
+  renderVals(){
+    const {preset, tab, vendEstado, prodBusca, prodMetrica} = this.state;
+    const factors = {'Tudo':1, '30 dias':0.11, '90 dias':0.33, 'Este ano':0.74};
+    const fct = factors[preset];
+    const {rotas, vendedores, produtos, faixas, trend} = this.data;
+
+    // KPIs
+    const fatTotal = rotas.reduce((s,r)=>s+r.fat_sem*12,0)*fct;
+    const pedTotal = rotas.reduce((s,r)=>s+r.ped_sem*12,0)*fct;
+    const ticket = pedTotal? fatTotal/pedTotal : 0;
+    const cliTotal = vendedores.reduce((s,v)=>s+v.cli,0)*fct;
+    const topVend = [...vendedores].sort((a,b)=>b.fat-a.fat)[0];
+    const kpis = [
+      {label:'Faturamento total', value:this.brl(fatTotal), sub:preset.toLowerCase(), color:'#3BA9FF'},
+      {label:'Pedidos', value:this.num(pedTotal), sub:'PRE-VENDA válidos', color:'#22D3EE'},
+      {label:'Ticket médio', value:this.brlFull(ticket), sub:'faturamento ÷ pedidos', color:'#00E0A1'},
+      {label:'Rotas ativas', value:String(rotas.length), sub:'com vendas no período', color:'#2E7CF6'},
+      {label:'Clientes atendidos', value:this.num(cliTotal), sub:'base ativa', color:'#7B8BFF'},
+      {label:'Top vendedor', value:topVend.nome.split(' ')[0], sub:this.brl(topVend.fat*fct), color:'#FFC53D'},
+    ];
+
+    const presets = ['Tudo','30 dias','90 dias','Este ano'].map(p=>({label:p, bg: preset===p?'#2E7CF6':'transparent', fg: preset===p?'#fff':'#8B92A5', onClick:()=>this.setState({preset:p})}));
+    const tabs = [{k:'rotas',l:'🛣️ Rotas'},{k:'vend',l:'🧑‍💼 Vendedores'},{k:'prod',l:'🛒 Produtos'},{k:'faixa',l:'👥 Faixa Etária'}].map(t=>({label:t.l, bg: tab===t.k?'rgba(59,169,255,.16)':'transparent', fg: tab===t.k?'#9CC6FF':'#7B8499', onClick:()=>this.setState({tab:t.k})}));
+
+    // trend
+    const maxT = Math.max(...trend.map(t=>t.fat));
+    const trendPts = trend.map((t,i)=>(i/(trend.length-1)*100).toFixed(1)+','+(100-t.fat/maxT*88).toFixed(1)).join(' ');
+    const trendArea = 'M 0,100 L '+trend.map((t,i)=>(i/(trend.length-1)*100).toFixed(1)+','+(100-t.fat/maxT*88).toFixed(1)).join(' L ')+' L 100,100 Z';
+    const trendDots = trend.map((t,i)=>({x:i/(trend.length-1)*100, y:100-t.fat/maxT*88}));
+
+    // rotas
+    const rotasSorted = [...rotas].sort((a,b)=>b.fat_sem-a.fat_sem);
+    const maxFat = rotasSorted[0].fat_sem;
+    const q = (arr,p)=>{ const a=[...arr].sort((x,y)=>x-y); return a[Math.floor(p*(a.length-1))]; };
+    const p25 = q(rotas.map(r=>r.fat_sem),.25), p75 = q(rotas.map(r=>r.fat_sem),.75);
+    const nivel = (v)=> v>=p75?{t:'Alto',c:'#00E0A1',b:'rgba(0,224,161,.12)'}:(v>=p25?{t:'Médio',c:'#FFC53D',b:'rgba(255,197,61,.12)'}:{t:'Baixo',c:'#FF8A4C',b:'rgba(255,138,76,.12)'});
+    const rotaBars = rotasSorted.slice(0,10).map(r=>({nome:r.nome, w:Math.max(3,r.fat_sem/maxFat*100), label:this.brl(r.fat_sem*fct)}));
+    const rotaRows = rotasSorted.map(r=>{ const n=nivel(r.fat_sem); return {nome:r.nome, pedLabel:(r.ped_sem*fct).toFixed(0), fatLabel:this.brl(r.fat_sem*fct), ticketLabel:this.brlFull(r.ticket), nivel:n.t, nivelCor:n.c, nivelBg:n.b}; });
+
+    // vendedores
+    const estadoOpts = ['Todos', ...this.estados];
+    let vendF = vendEstado==='Todos'? vendedores : vendedores.filter(v=>v.estado===vendEstado || v.sec===vendEstado);
+    const vendSorted = [...vendF].sort((a,b)=>b.fat-a.fat);
+    const vendRanking = vendSorted.map((v,i)=>({nome:v.nome, pos:i+1, ped:this.num(v.ped*fct), cli:this.num(v.cli*fct), estado:v.estado, fatLabel:this.brl(v.fat*fct),
+      posBg: i===0?'rgba(255,197,61,.18)':(i<3?'rgba(59,169,255,.15)':'rgba(255,255,255,.05)'),
+      posFg: i===0?'#FFC53D':(i<3?'#9CC6FF':'#7B8499')}));
+    // heatmap
+    const heatVend = [...vendedores].sort((a,b)=>b.fat-a.fat).slice(0,10);
+    const matrix = {};
+    let maxCell = 1;
+    heatVend.forEach(v=>{ matrix[v.nome] = {}; this.estados.forEach(e=>{ let val=0; if(v.estado===e) val=v.fat; else if(v.sec===e) val=Math.round(v.fat*0.32); matrix[v.nome][e]=val; if(val>maxCell)maxCell=val; }); });
+    const heatRows = heatVend.map(v=>({nome:v.nome.split(' ')[0]+' '+(v.nome.split(' ')[1]||'')[0]+'.', cells: this.estados.map(e=>{ const val=matrix[v.nome][e]*fct; const t=matrix[v.nome][e]/maxCell; return {label: val>0?this.brl(val):'·', bg: val>0?'rgba(46,124,246,'+(0.12+t*0.6).toFixed(2)+')':'rgba(255,255,255,.02)', fg: t>0.5?'#EAF2FF':(val>0?'#9CC6FF':'#3A4150')}; })}));
+
+    // produtos
+    const metricaBtns = ['Faturamento','Quantidade'].map(m=>({label:m, bg: prodMetrica===m?'#2E7CF6':'transparent', fg: prodMetrica===m?'#fff':'#8B92A5', onClick:()=>this.setState({prodMetrica:m})}));
+    const key = prodMetrica==='Faturamento'?'faturamento':'qtd';
+    let prodF = produtos;
+    if(prodBusca) prodF = prodF.filter(p=>p.produto.toLowerCase().includes(prodBusca.toLowerCase()));
+    const prodSorted = [...prodF].sort((a,b)=>b[key]-a[key]);
+    const maxP = prodSorted.length? prodSorted[0][key] : 1;
+    const prodBars = prodSorted.slice(0,15).map(p=>({produto:p.produto, short:p.short, w:Math.max(3,p[key]/maxP*100), label: key==='faturamento'?this.brl(p.faturamento*fct):this.num(p.qtd*fct)}));
+    const prodRows = prodSorted.map(p=>({produto:p.produto, short:p.short, qtdLabel:this.num(p.qtd*fct), pedidos:this.num(p.pedidos*fct), fatLabel:this.brl(p.faturamento*fct)}));
+
+    // faixa
+    const maxFatF = Math.max(...faixas.map(f=>f.faturamento));
+    const maxTicket = Math.max(...faixas.map(f=>f.ticket));
+    const faixaBars = faixas.map(f=>({faixa:f.faixa, fatLabel:this.brl(f.faturamento*fct), hFat:f.faturamento/maxFatF*100, hTicket:f.ticket/maxTicket*100}));
+    const totCli = faixas.reduce((s,f)=>s+f.clientes,0);
+    let acc=0; const segs=[];
+    faixas.forEach(f=>{ const a=acc, b=acc+f.clientes/totCli*100; segs.push(f.cor+' '+a.toFixed(1)+'% '+b.toFixed(1)+'%'); acc=b; });
+    const donutBg = 'conic-gradient('+segs.join(',')+')';
+    const faixaLegend = faixas.map(f=>({faixa:f.faixa, cor:f.cor, pct:(f.clientes/totCli*100).toFixed(0)}));
+
+    return {
+      presetLabel: preset.toLowerCase(), presets, kpis, tabs,
+      recarregar:()=>this.forceUpdate(),
+      tabRotas: tab==='rotas', tabVend: tab==='vend', tabProd: tab==='prod', tabFaixa: tab==='faixa',
+      trendPts, trendArea, trendDots, trendFirst:'12 sem atrás', trendLast:'esta semana',
+      rotaBars, rotaRows,
+      estadoOpts, vendEstado, setVendEstado:(e)=>this.setState({vendEstado:e.target.value}),
+      nEstados:this.estados.length, estadosHead:this.estados, heatRows, vendRanking,
+      prodBusca, setProdBusca:(e)=>this.setState({prodBusca:e.target.value}),
+      metricaBtns, metricaLabel:prodMetrica, prodBars, prodRows, prodCount:prodSorted.length,
+      faixaBars, donutBg, faixaLegend, totalClientes:this.num(totCli*fct),
+    };
+  }
+}
+</script>
+</body>
+</html>
