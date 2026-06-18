@@ -10,9 +10,6 @@ from db import load_empresas, load_giro_estoque, load_colunas, load_idade_estoqu
 
 st.set_page_config(page_title="Giro & Ruptura", page_icon="📦", layout="wide")
 
-if st.button("🔄 Atualizar agora"):
-    st.cache_data.clear()
-    st.rerun()
 
 LEAD_TIME_DIAS = 15  # prazo médio de reposição
 
@@ -62,404 +59,154 @@ def kpi(col, label, value, color=CYAN, sub=None):
             unsafe_allow_html=True)
 
 # ── DADOS ─────────────────────────────────────────────────────────────────────
+
+
+# ── Giro & Ruptura: dados consolidados ──
+from db_giro_ruptura import (
+    load_giro_ruptura,
+    kpis_giro_ruptura,
+    runway_ruptura,
+    classe_a_em_risco,
+)
+
+
 @st.cache_data(ttl=120, show_spinner=False)
-def fetch_empresas():
+def fetch_empresas_gr():
     return load_empresas()
 
-@st.cache_data(ttl=120, show_spinner="Calculando giro de estoque...")
-def fetch_giro(dias, id_empresa):
-    return load_giro_estoque(dias, id_empresa)
 
-@st.cache_data(ttl=120, show_spinner="Calculando idade do estoque...")
-def fetch_idade(id_empresa):
-    return load_idade_estoque(id_empresa)
+@st.cache_data(ttl=120, show_spinner="Calculando giro e ruptura...")
+def fetch_giro_ruptura(dias, lead, id_emp):
+    return load_giro_ruptura(dias=dias, lead_time=lead, id_empresa=id_emp)
 
-try:
-    empresas = fetch_empresas()
-except Exception as e:
-    st.error(f"Não foi possível carregar as empresas: {e}")
-    st.stop()
 
-if empresas.empty:
-    st.warning("Nenhuma empresa cadastrada na tabela `empresa`.")
-    st.stop()
+STT_COR = {
+    "Risco ruptura": "#f59e0b",
+    "Sem estoque": "#ef4444",
+    "Parado": "#9ca3af",
+    "Excesso": "#3b82f6",
+    "Saudável": "#22c55e",
+}
 
-# ── HEADER + FILTROS GLOBAIS ─────────────────────────────────────────────────
-st.markdown(
-    f'## 📦 Estoque — Giro & Ruptura&nbsp;&nbsp;'
-    f'<span style="font-size:.75rem;color:#8B92A5;font-weight:400">'
-    f'Atualizado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
-    f' · saídas: PRE-VENDA + BRINDE + REPOSICAO · cache 2 min</span>',
-    unsafe_allow_html=True)
+hc1, hc2 = st.columns([8, 1])
+hc1.markdown(
+    '<div style="display:flex;align-items:center;gap:.6rem;margin:.2rem 0 .4rem">'
+    '<span style="font-size:1.9rem">📦</span><div>'
+    '<div style="font-size:1.7rem;font-weight:800;color:#fff;line-height:1.1">Estoque — Giro &amp; Ruptura</div>'
+    '<div style="color:#8892A5;font-size:.8rem">Cobertura, curva ABC e tempo parado · '
+    'saídas PRE-VENDA + BRINDE + REPOSIÇÃO · cache 2 min</div></div></div>',
+    unsafe_allow_html=True,
+)
+with hc2:
+    if st.button("🔄 Recarregar"):
+        st.cache_data.clear()
+        st.rerun()
 
-fc0, fc1, fc2, fc3 = st.columns([3, 2, 2, 3])
-with fc0:
-    emp_nome = st.selectbox(
-        "🏢 Empresa",
-        empresas.nome_empresa.tolist(), key="est_empresa")
-    emp_id = int(empresas.loc[empresas.nome_empresa == emp_nome, 'id_empresa'].iloc[0])
-with fc1:
-    janela = st.radio("Janela de saída", [30, 60, 90], horizontal=True,
-                      format_func=lambda d: f"{d} dias", key="est_janela")
-with fc2:
-    lead = st.slider("Prazo de reposição (dias)", 5, 45, LEAD_TIME_DIAS, 5,
-                     key="est_lead")
-with fc3:
-    busca = st.text_input("🔍 Buscar produto", "", key="est_busca",
-                          placeholder="Digite parte do nome...")
+empresas = fetch_empresas_gr()
+fc1, fc2, fc3, fc4 = st.columns([2, 1.5, 1.5, 2])
+emp = fc1.selectbox("EMPRESA", empresas["nome_empresa"])
+id_emp = int(empresas.loc[empresas["nome_empresa"] == emp, "id_empresa"].iloc[0])
+dias = fc2.radio("JANELA DE SAÍDA", [30, 60, 90], horizontal=True)
+lead = fc3.slider("PRAZO DE REPOSIÇÃO (dias)", 5, 45, 15, step=5)
+busca = fc4.text_input("BUSCAR PRODUTO", "", placeholder="Nome do produto...")
 
-try:
-    ge = fetch_giro(janela, emp_id)
-except Exception as exc:
-    st.error(f"Erro na consulta de giro: {exc}")
-    st.markdown("### 🔧 Diagnóstico — colunas das tabelas envolvidas")
+df = fetch_giro_ruptura(dias, lead, id_emp)
+dfv = df[df["produto"].str.contains(busca, case=False, na=False)] if busca else df
+
+
+def _chip(label, n, cor):
+    return (
+        '<span style="display:inline-flex;align-items:center;gap:6px;background:#1b2233;'
+        'border:1px solid #2a3650;border-radius:20px;padding:4px 12px;margin:0 6px 6px 0;'
+        f'font-size:.8rem;color:#cdd6e5"><span style="width:8px;height:8px;border-radius:50%;'
+        f'background:{cor}"></span>{label} <b style="color:#fff">{n}</b></span>'
+    )
+
+
+chips = '<div style="margin:.3rem 0 .7rem"><span style="color:#8892A5;font-size:.72rem;letter-spacing:.08em;margin-right:4px">STATUS</span>'
+for s, c in STT_COR.items():
+    chips += _chip(s, int((df["status"] == s).sum()), c)
+chips += '<span style="color:#8892A5;font-size:.72rem;letter-spacing:.08em;margin:0 4px 0 14px">CLASSE</span>'
+for cl in ["A", "B", "C"]:
+    chips += _chip(f"Classe {cl}", int((df["classe"] == cl).sum()), "#8892A5")
+chips += "</div>"
+st.markdown(chips, unsafe_allow_html=True)
+
+k = kpis_giro_ruptura(df)
+kc = st.columns(5)
+kpi(kc[0], "RISCO DE RUPTURA", str(k["risco_ruptura"]), color=RED, sub=f"rompem em ≤ {lead}d")
+kpi(kc[1], "SEM ESTOQUE", str(k["sem_estoque"]), color=AMBER, sub="vendendo com saldo zerado")
+kpi(kc[2], "GIRO GERAL", f'{k["giro_geral"]}x', color=CYAN, sub=f"saída ÷ estoque · {dias}d")
+kpi(kc[3], "COBERTURA MEDIANA", f'{k["cobertura_mediana"]}d', color=CYAN, sub="dias de estoque restante")
+kpi(kc[4], "CLASSE A EM RISCO", str(k["classe_a_risco"]), color=AMBER, sub="alto giro rompendo")
+
+st.write("")
+tab1, tab2, tab3 = st.tabs(["📊 Giro & Cobertura", "🔢 Curva ABC", "⏰ Tempo Parado"])
+
+with tab1:
+    cL, cR = st.columns(2)
+    with cL:
+        st.markdown("##### ⏱️ RUNWAY DE RUPTURA")
+        st.caption(f"Produtos que rompem primeiro · linha = prazo de reposição ({lead}d)")
+        zer = int((df["status"] == "Sem estoque").sum())
+        if zer:
+            st.error(f"{zer} produto(s) já zeraram e seguem vendendo — comprar primeiro.")
+        rw = runway_ruptura(dfv)
+        st.dataframe(
+            rw[["produto", "estoque", "saida_periodo", "cobertura_dias", "status"]],
+            use_container_width=True, hide_index=True,
+        )
+    with cR:
+        st.markdown("##### 🎯 MATRIZ GIRO × COBERTURA")
+        st.caption("Cada bolha = um produto · tamanho = estoque · cor = status")
+        mtx = dfv.dropna(subset=["cobertura_dias"])
+        fig = go.Figure()
+        for s, c in STT_COR.items():
+            g = mtx[mtx["status"] == s]
+            if len(g):
+                fig.add_trace(go.Scatter(
+                    x=g["media_dia"], y=g["cobertura_dias"], mode="markers", name=s,
+                    marker=dict(size=(g["estoque"] ** 0.5).clip(7, 38), color=c, line=dict(width=0), opacity=0.85),
+                    text=g["produto"],
+                    hovertemplate="%{text}<br>demanda %{x}/dia<br>cobertura %{y}d<extra></extra>",
+                ))
+        fig.add_hline(y=lead, line_dash="dot", line_color="#ef4444")
+        fig.update_layout(
+            template="plotly_dark", height=430, showlegend=True,
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Demanda (un/dia)", yaxis_title="Cobertura (dias)",
+            legend=dict(orientation="h", y=-0.2), margin=dict(l=10, r=10, t=10, b=10),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+with tab2:
+    st.markdown("##### 🔢 CURVA ABC")
+    abc = (
+        df.groupby("classe")
+          .agg(produtos=("produto", "count"), saida=("saida_periodo", "sum"))
+          .reindex(["A", "B", "C"]).fillna(0).reset_index()
+    )
+    cc = st.columns(3)
+    cores_abc = [GREEN, AMBER, RED]
+    for i in range(len(abc)):
+        row = abc.iloc[i]
+        kpi(cc[i], f"CLASSE {row['classe']}", str(int(row["produtos"])),
+            color=cores_abc[i], sub=f"{int(row['saida'])} un. de saída")
+    fig2 = go.Figure(go.Bar(x=abc["classe"], y=abc["saida"], marker_color=cores_abc))
+    fig2.update_layout(template="plotly_dark", height=300, paper_bgcolor="rgba(0,0,0,0)",
+                       plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10),
+                       yaxis_title="Saída no período")
+    st.plotly_chart(fig2, use_container_width=True)
+    st.markdown("###### 🚨 Classe A em risco")
     st.dataframe(
-        load_colunas(['pedido', 'rotas', 'vendedor', 'clientes',
-                      'estoque_geral', 'empresa']),
-        use_container_width=True, hide_index=True, height=600)
-    st.stop()
+        classe_a_em_risco(dfv)[["produto", "estoque", "cobertura_dias", "status"]],
+        use_container_width=True, hide_index=True,
+    )
 
-# ── STATUS + CLASSE ABC ──────────────────────────────────────────────────────
-def status_giro(r):
-    if r.saida_periodo > 0 and r.estoque <= 0:
-        return "🔴 Sem estoque"
-    if r.saida_periodo == 0:
-        return "🟡 Parado"
-    if pd.notna(r.cobertura_dias) and r.cobertura_dias <= lead:
-        return "🔴 Risco ruptura"
-    if pd.notna(r.cobertura_dias) and r.cobertura_dias > 90:
-        return "🟠 Excesso"
-    return "🟢 Saudável"
-
-ge = ge.copy()
-for col in ['estoque', 'saida_periodo', 'media_dia', 'giro', 'cobertura_dias']:
-    ge[col] = pd.to_numeric(ge[col], errors='coerce')
-ge['status'] = ge.apply(status_giro, axis=1)
-
-# Curva ABC pelo volume de saída no período (80 / 95 / 100)
-ge = ge.sort_values('saida_periodo', ascending=False).reset_index(drop=True)
-tot_saida = ge.saida_periodo.sum()
-if tot_saida > 0:
-    cum = ge.saida_periodo.cumsum() / tot_saida
-    ge['classe'] = cum.apply(lambda v: 'A' if v <= .80 else ('B' if v <= .95 else 'C'))
-    ge.loc[ge.saida_periodo <= 0, 'classe'] = 'C'
-else:
-    ge['classe'] = 'C'
-
-gef = ge[ge.produto.str.contains(busca, case=False, na=False)] if busca else ge
-
-tab_giro, tab_compra, tab_abc, tab_idade = st.tabs(
-    ["📊 Giro e Cobertura", "🛒 Planejamento de Compra", "🔠 Curva ABC",
-     "⏰ Tempo Parado"])
-
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 1 — GIRO E COBERTURA
-# ════════════════════════════════════════════════════════════════════════════
-with tab_giro:
-    sem_estoque = (ge.status == "🔴 Sem estoque").sum()
-    risco = (ge.status == "🔴 Risco ruptura").sum()
-    parados = (ge.status == "🟡 Parado").sum()
-    com_venda = ge[ge.saida_periodo > 0]
-    giro_geral = (com_venda.saida_periodo.sum() / com_venda.estoque.sum()) \
-                 if com_venda.estoque.sum() > 0 else 0
-
-    c1, c2, c3, c4 = st.columns(4)
-    kpi(c1, "Sem Estoque", str(sem_estoque), RED, "vendendo com saldo zerado")
-    kpi(c2, "Repor Urgente", str(risco), AMBER, f"cobertura entre 1 e {lead} dias")
-    kpi(c3, "Produtos Parados", str(parados), PURPLE, f"sem saída em {janela} dias")
-    kpi(c4, "Giro Geral", f"{giro_geral:.2f}x", GREEN, f"saída ÷ estoque em {janela} dias")
-    st.markdown("---")
-
-    ca, cb = st.columns([2, 3])
-    with ca:
-        st.markdown(f"### ⏳ Repor Urgente — cobertura de 1 a {lead*2} dias")
-        st.caption("Produtos com saldo zerado não entram aqui — estão no KPI 'Sem Estoque' e na tabela ao lado.")
-        crit = gef[(gef.saida_periodo > 0) & (gef.estoque > 0)
-                   & (gef.cobertura_dias <= lead * 2)] \
-                .nsmallest(15, 'cobertura_dias')
-        if len(crit):
-            fgi = go.Figure(go.Bar(
-                x=crit.cobertura_dias, y=crit.produto, orientation='h',
-                marker=dict(color=crit.cobertura_dias,
-                            colorscale=[[0, RED], [.6, AMBER], [1, '#30363D']],
-                            showscale=False, line=dict(width=0)),
-                text=crit.cobertura_dias.apply(lambda v: f"{v:.0f}d"),
-                textposition='outside',
-                textfont=dict(size=9, color='#8B92A5')))
-            fgi.add_vline(x=lead, line_dash="dash", line_color=RED,
-                          annotation_text=f"reposição ({lead}d)",
-                          annotation_font_size=9)
-            fgi.update_traces(cliponaxis=False)
-            fgi.update_layout(**PL, height=max(360, 30*len(crit)))
-            fgi.update_layout(margin=dict(l=0, r=40, t=30, b=0))
-            fgi.update_yaxes(autorange='reversed', tickfont=dict(size=9))
-            fgi.update_xaxes(tickfont=dict(size=9),
-                             gridcolor='rgba(255,255,255,.05)')
-            st.plotly_chart(fgi, use_container_width=True)
-        else:
-            st.info("Nenhum produto com cobertura crítica nessa empresa. 👍")
-    with cb:
-        st.markdown(f"### Visão Completa — {emp_nome}")
-        sel_status = st.multiselect(
-            "Filtrar por status (vazio = todos)",
-            sorted(ge.status.unique().tolist()), key="est_status")
-        gtab = gef[gef.status.isin(sel_status)] if sel_status else gef
-        gtab = gtab.sort_values(['estoque', 'saida_periodo'],
-                                ascending=[True, False])
-        st.dataframe(
-            gtab[['produto','classe','estoque','saida_periodo','media_dia',
-                  'giro','cobertura_dias','status']],
-            column_config={
-                'produto': st.column_config.TextColumn('Produto'),
-                'classe': st.column_config.TextColumn('ABC'),
-                'estoque': st.column_config.NumberColumn('Estoque', format="%d"),
-                'saida_periodo': st.column_config.NumberColumn(f'Saída {janela}d', format="%d"),
-                'media_dia': st.column_config.NumberColumn('Média/Dia', format="%.2f"),
-                'giro': st.column_config.NumberColumn('Giro', format="%.2fx"),
-                'cobertura_dias': st.column_config.NumberColumn('Cobertura (dias)', format="%.0f"),
-                'status': st.column_config.TextColumn('Status'),
-            },
-            height=520, use_container_width=True, hide_index=True)
-
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 2 — PLANEJAMENTO DE COMPRA
-# ════════════════════════════════════════════════════════════════════════════
-with tab_compra:
-    fc1, fc2 = st.columns([2, 5])
-    with fc1:
-        alvo = st.slider("Cobertura alvo após compra (dias)", 15, 90, 30, 5,
-                         key="est_alvo")
-    st.caption(
-        f"Sugestão de compra = média diária × (reposição {lead}d + alvo {alvo}d) − estoque atual. "
-        f"Só entram produtos com venda nos últimos {janela} dias.")
-
-    plan = gef[gef.media_dia > 0].copy()
-    hoje = pd.Timestamp.today().normalize()
-    plan['cob'] = plan.cobertura_dias.fillna(0).clip(upper=3650)  # evita overflow de data
-    plan['data_ruptura'] = (hoje + pd.to_timedelta(plan.cob, unit='D')).dt.strftime('%d/%m/%Y')
-    plan.loc[plan.cobertura_dias.fillna(0) > 3650, 'data_ruptura'] = '> 10 anos'
-    plan.loc[plan.estoque <= 0, 'data_ruptura'] = '⚠️ JÁ ZEROU'
-    plan['sugestao'] = ((plan.media_dia * (lead + alvo)) - plan.estoque).clip(lower=0).round(0)
-    plan = plan[plan.sugestao > 0].sort_values(
-        ['classe', 'sugestao'], ascending=[True, False])
-
-    c1, c2, c3, c4 = st.columns(4)
-    kpi(c1, "Produtos a Comprar", str(len(plan)), CYAN)
-    kpi(c2, "Unidades Sugeridas", f"{int(plan.sugestao.sum()):,}".replace(",", "."),
-        PURPLE)
-    kpi(c3, "Itens Classe A", str((plan.classe == 'A').sum()), GREEN,
-        "prioridade máxima")
-    kpi(c4, "Já Zerados", str((plan.estoque <= 0).sum()), RED,
-        "comprar primeiro")
-    st.markdown("---")
-
-    ca, cb = st.columns([3, 2])
-    with ca:
-        st.markdown("### 📋 Lista de Compra Sugerida")
-        st.dataframe(
-            plan[['produto','classe','estoque','media_dia','data_ruptura',
-                  'sugestao','id_fornecedor']],
-            column_config={
-                'produto': st.column_config.TextColumn('Produto'),
-                'classe': st.column_config.TextColumn('ABC'),
-                'estoque': st.column_config.NumberColumn('Estoque', format="%d"),
-                'media_dia': st.column_config.NumberColumn('Média/Dia', format="%.2f"),
-                'data_ruptura': st.column_config.TextColumn('Ruptura Prevista'),
-                'sugestao': st.column_config.NumberColumn('Comprar (un.)', format="%d"),
-                'id_fornecedor': st.column_config.NumberColumn('Fornecedor', format="%d"),
-            },
-            height=480, use_container_width=True, hide_index=True)
-        st.download_button(
-            "⬇️ Baixar pedido de compra (CSV)",
-            data=plan[['produto','classe','estoque','media_dia','data_ruptura',
-                       'sugestao','id_fornecedor']].to_csv(index=False).encode('utf-8'),
-            file_name=f"pedido_compra_{emp_nome}_{hoje.strftime('%Y%m%d')}.csv",
-            mime="text/csv")
-    with cb:
-        st.markdown("### 🏭 Resumo por Fornecedor")
-        forn = (plan.groupby('id_fornecedor', dropna=False)
-                    .agg(produtos=('produto', 'count'),
-                         unidades=('sugestao', 'sum'),
-                         classe_a=('classe', lambda s: (s == 'A').sum()))
-                    .reset_index()
-                    .sort_values('unidades', ascending=False))
-        st.dataframe(
-            forn,
-            column_config={
-                'id_fornecedor': st.column_config.NumberColumn('Fornecedor', format="%d"),
-                'produtos': st.column_config.NumberColumn('Produtos', format="%d"),
-                'unidades': st.column_config.NumberColumn('Unidades', format="%d"),
-                'classe_a': st.column_config.NumberColumn('Itens A', format="%d"),
-            },
-            height=480, use_container_width=True, hide_index=True)
-
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 3 — CURVA ABC
-# ════════════════════════════════════════════════════════════════════════════
-with tab_abc:
-    n_a = (ge.classe == 'A').sum(); n_b = (ge.classe == 'B').sum()
-    n_c = (ge.classe == 'C').sum()
-    a_sem_estoque = ((ge.classe == 'A') &
-                     (ge.status.isin(['🔴 Sem estoque', '🔴 Risco ruptura']))).sum()
-
-    c1, c2, c3, c4 = st.columns(4)
-    kpi(c1, "Classe A", str(n_a), GREEN, "80% do volume de saída")
-    kpi(c2, "Classe B", str(n_b), AMBER, "15% do volume")
-    kpi(c3, "Classe C", str(n_c), '#8B92A5', "5% do volume + parados")
-    kpi(c4, "⚠️ A em risco", str(a_sem_estoque), RED,
-        "classe A zerado ou rompendo")
-    st.markdown("---")
-
-    ca, cb = st.columns([3, 2])
-    with ca:
-        st.markdown("### 📈 Pareto — Top 25 produtos por saída")
-        top = ge[ge.saida_periodo > 0].head(25).copy()
-        if len(top):
-            top['cum_pct'] = top.saida_periodo.cumsum() / tot_saida * 100
-            fp = go.Figure()
-            fp.add_bar(x=list(range(1, len(top)+1)), y=top.saida_periodo,
-                       marker=dict(color=[COR_CLASSE[c] for c in top.classe],
-                                   line=dict(width=0)),
-                       text=top.produto.str[:18], textposition='none',
-                       hovertemplate='%{customdata}<br>Saída: %{y}<extra></extra>',
-                       customdata=top.produto, name='Saída')
-            fp.add_scatter(x=list(range(1, len(top)+1)), y=top.cum_pct,
-                           yaxis='y2', mode='lines+markers',
-                           line=dict(color=CYAN, width=2),
-                           marker=dict(size=5),
-                           hovertemplate='%{y:.0f}% acumulado<extra></extra>',
-                           name='% acumulado')
-            fp.update_layout(**PL, height=420, showlegend=False)
-            fp.update_layout(
-                yaxis2=dict(overlaying='y', side='right', range=[0, 105],
-                            ticksuffix='%', tickfont=dict(size=9),
-                            gridcolor='rgba(0,0,0,0)'),
-                xaxis=dict(title='ranking de produtos', tickfont=dict(size=9)))
-            fp.update_yaxes(tickfont=dict(size=9),
-                            gridcolor='rgba(255,255,255,.05)')
-            st.plotly_chart(fp, use_container_width=True)
-        st.caption("🟢 A · 🟡 B · ⚪ C — linha azul = % acumulado da saída")
-    with cb:
-        st.markdown("### Classe × Status do Estoque")
-        cruz = (ge.groupby(['classe', 'status']).size()
-                  .reset_index(name='produtos')
-                  .pivot(index='status', columns='classe', values='produtos')
-                  .fillna(0).astype(int))
-        st.dataframe(cruz, use_container_width=True)
-        st.markdown("### 🚨 Classe A em risco")
-        a_risco = ge[(ge.classe == 'A') &
-                     (ge.status.isin(['🔴 Sem estoque', '🔴 Risco ruptura']))]
-        st.dataframe(
-            a_risco[['produto', 'estoque', 'saida_periodo', 'status']],
-            column_config={
-                'produto': st.column_config.TextColumn('Produto'),
-                'estoque': st.column_config.NumberColumn('Estoque', format="%d"),
-                'saida_periodo': st.column_config.NumberColumn(f'Saída {janela}d', format="%d"),
-                'status': st.column_config.TextColumn('Status'),
-            },
-            height=260, use_container_width=True, hide_index=True)
-
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 4 — TEMPO PARADO (idade do estoque)
-# ════════════════════════════════════════════════════════════════════════════
-with tab_idade:
-    ida = fetch_idade(emp_id).copy()
-    ida['estoque'] = pd.to_numeric(ida.estoque, errors='coerce')
-    ida['dias_parado'] = pd.to_numeric(ida.dias_parado, errors='coerce')
-    # junta a classe ABC calculada na janela atual
-    ida = ida.merge(ge[['produto', 'classe']], on='produto', how='left')
-    ida['classe'] = ida.classe.fillna('C')
-
-    def faixa_idade(d):
-        if pd.isna(d):
-            return '🚫 Nunca saiu'
-        if d <= 30:
-            return '🟢 0–30 dias'
-        if d <= 60:
-            return '🟡 31–60 dias'
-        if d <= 90:
-            return '🟠 61–90 dias'
-        if d <= 180:
-            return '🔴 91–180 dias'
-        return '⚫ +180 dias'
-
-    ida['faixa'] = ida.dias_parado.apply(faixa_idade)
-    idaf = ida[ida.produto.str.contains(busca, case=False, na=False)] if busca else ida
-
-    girando = (ida.dias_parado <= 30).sum()
-    p60_90 = ((ida.dias_parado > 30) & (ida.dias_parado <= 90)).sum()
-    p90 = (ida.dias_parado > 90).sum()
-    nunca = ida.dias_parado.isna().sum()
-    un_paradas = int(ida.loc[ida.dias_parado.fillna(9999) > 90, 'estoque'].sum())
-
-    c1, c2, c3, c4 = st.columns(4)
-    kpi(c1, "Girando (≤30d)", str(girando), GREEN, "saíram no último mês")
-    kpi(c2, "Esfriando (31–90d)", str(p60_90), AMBER, "atenção")
-    kpi(c3, "Parados +90d", str(p90), RED,
-        f"{un_paradas:,} unidades encalhadas".replace(",", "."))
-    kpi(c4, "Nunca Saíram", str(nunca), PURPLE, "estoque sem nenhuma venda")
-    st.markdown("---")
-
-    ca, cb = st.columns([2, 3])
-    with ca:
-        st.markdown("### 📊 Distribuição por Idade")
-        ordem = ['🟢 0–30 dias', '🟡 31–60 dias', '🟠 61–90 dias',
-                 '🔴 91–180 dias', '⚫ +180 dias', '🚫 Nunca saiu']
-        dist = (ida.groupby('faixa')
-                   .agg(produtos=('produto', 'count'),
-                        unidades=('estoque', 'sum'))
-                   .reindex(ordem).fillna(0))
-        cores_fx = [GREEN, AMBER, '#FF8C42', RED, '#666B78', PURPLE]
-        fd = go.Figure(go.Bar(
-            x=dist.index, y=dist.produtos,
-            marker=dict(color=cores_fx, line=dict(width=0)),
-            text=[f"{int(p)} prod.<br>{int(u):,} un.".replace(",", ".")
-                  for p, u in zip(dist.produtos, dist.unidades)],
-            textposition='outside', textfont=dict(size=9)))
-        fd.update_traces(cliponaxis=False)
-        fd.update_layout(**PL, height=400)
-        fd.update_layout(margin=dict(l=0, r=4, t=50, b=0))
-        fd.update_xaxes(tickfont=dict(size=9))
-        fd.update_yaxes(visible=False)
-        st.plotly_chart(fd, use_container_width=True)
-        st.caption("Tempo desde a última saída de cada produto que tem saldo em estoque.")
-    with cb:
-        st.markdown("### 🗃️ Produtos por Tempo Parado")
-        sel_faixa = st.multiselect("Filtrar por faixa (vazio = todas)",
-                                   ordem, key="idade_faixa")
-        itab = idaf[idaf.faixa.isin(sel_faixa)] if sel_faixa else idaf
-        itab = itab.sort_values('dias_parado', ascending=False, na_position='first')
-        st.dataframe(
-            itab[['produto', 'classe', 'estoque', 'ultima_saida',
-                  'dias_parado', 'faixa']],
-            column_config={
-                'produto': st.column_config.TextColumn('Produto'),
-                'classe': st.column_config.TextColumn('ABC'),
-                'estoque': st.column_config.NumberColumn('Estoque', format="%d"),
-                'ultima_saida': st.column_config.DateColumn('Última Saída',
-                                                            format="DD/MM/YYYY"),
-                'dias_parado': st.column_config.NumberColumn('Dias Parado', format="%d"),
-                'faixa': st.column_config.TextColumn('Faixa'),
-            },
-            height=480, use_container_width=True, hide_index=True)
-        st.download_button(
-            "⬇️ Baixar lista de parados (CSV)",
-            data=itab[['produto', 'classe', 'estoque', 'ultima_saida',
-                       'dias_parado', 'faixa']].to_csv(index=False).encode('utf-8'),
-            file_name=f"tempo_parado_{emp_nome}.csv", mime="text/csv")
-
-st.caption(
-    f"Empresa: **{emp_nome}** · Saídas = unidades de itens ativos em pedidos "
-    f"PRE-VENDA, BRINDE e REPOSICAO da empresa nos últimos {janela} dias · "
-    f"Estoque = saldo disponível atual da empresa · ABC = participação no volume "
-    f"de saída (A ≤ 80%, B ≤ 95%, C restante) · Tempo parado = dias desde a "
-    f"última saída do produto")
-
-with st.expander("🔧 Explorar colunas de uma tabela (diagnóstico)"):
-    tab_nome = st.text_input("Nome da tabela", "produto", key="diag_tab")
-    if tab_nome.strip():
-        try:
-            st.dataframe(load_colunas([tab_nome.strip()]),
-                         use_container_width=True, hide_index=True)
-        except Exception as exc:
-            st.error(f"Erro: {exc}")
+with tab3:
+    st.markdown("##### ⏰ TEMPO PARADO")
+    try:
+        idade = load_idade_estoque(id_emp)
+        st.dataframe(idade, use_container_width=True, hide_index=True)
+    except Exception as exc:
+        st.info(f"Tempo parado indisponível: {exc}")
