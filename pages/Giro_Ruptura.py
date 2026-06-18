@@ -9,8 +9,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db import load_empresas, load_giro_estoque, load_colunas, load_idade_estoque
 
 st.set_page_config(page_title="Giro & Ruptura", page_icon="📦", layout="wide")
-import auth
-auth.protect()
 
 if st.button("🔄 Atualizar agora"):
     st.cache_data.clear()
