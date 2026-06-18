@@ -165,7 +165,7 @@ with tab1:
             g = mtx[mtx["status"] == s]
             if len(g):
                 fig.add_trace(go.Scatter(
-                    x=g["media_dia"], y=g["cobertura_dias"], mode="markers", name=s,
+                    x=g["media_dia"], y=g["cobertura_dias"].clip(upper=120), mode="markers", name=s,
                     marker=dict(size=(g["estoque"] ** 0.5).clip(7, 38), color=c, line=dict(width=0), opacity=0.85),
                     text=g["produto"],
                     hovertemplate="%{text}<br>demanda %{x}/dia<br>cobertura %{y}d<extra></extra>",
@@ -174,7 +174,7 @@ with tab1:
         fig.update_layout(
             template="plotly_dark", height=430, showlegend=True,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="Demanda (un/dia)", yaxis_title="Cobertura (dias)",
+            xaxis_title="Demanda (un/dia)", yaxis=dict(title="Cobertura (dias)", range=[0, 125]),
             legend=dict(orientation="h", y=-0.2), margin=dict(l=10, r=10, t=10, b=10),
         )
         st.plotly_chart(fig, use_container_width=True)
