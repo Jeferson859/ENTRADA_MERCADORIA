@@ -2,6 +2,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+px.defaults.color_discrete_sequence = ["#2E7CF6", "#00D4FF", "#7B8BFF", "#00E0A1", "#FFC53D", "#FF8A4C", "#FF5C6C", "#9CC6FF"]
+px.defaults.color_continuous_scale = ["#0E1726", "#2E7CF6", "#00D4FF"]
 import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
 
@@ -16,6 +18,26 @@ from db import (
 )
 
 st.set_page_config(page_title="Dashboard de Vendas", page_icon="📊", layout="wide")
+
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    /* AdriLar theme inject */
+    html, body, [class*="css"] { font-family: 'Inter', system-ui, sans-serif; }
+    .block-container { padding-top: 2rem; max-width: 1400px; }
+    [data-testid="stMetric"] { background: rgba(255,255,255,.025); border: 1px solid rgba(59,169,255,.16); border-top: 3px solid #2E7CF6; border-radius: 14px; padding: 14px 16px 12px; }
+    [data-testid="stMetricLabel"] p { color:#9AA3B4; text-transform:uppercase; letter-spacing:.07em; font-size:10.5px; font-weight:600; }
+    [data-testid="stMetricValue"] { color:#F2F6FC; font-weight:800; font-variant-numeric:tabular-nums; }
+    h1, h2, h3 { color:#F2F6FC; letter-spacing:-.02em; }
+    .stTabs [data-baseweb="tab-list"] { gap:6px; border-bottom:1px solid rgba(59,169,255,.16); }
+    .stTabs [aria-selected="true"] { color:#3BA9FF; }
+    [data-testid="stSidebar"] { background:linear-gradient(180deg,#0B1322,#080D17); border-right:1px solid rgba(59,169,255,.16); }
+    .stDataFrame { border:1px solid rgba(59,169,255,.16); border-radius:12px; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""<style>
