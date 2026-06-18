@@ -1,11 +1,13 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+px.defaults.color_discrete_sequence = ["#2E7CF6", "#00D4FF", "#7B8BFF", "#00E0A1", "#FFC53D", "#FF8A4C", "#FF5C6C", "#9CC6FF"]
+px.defaults.color_continuous_scale = ["#0E1726", "#2E7CF6", "#00D4FF"]
 from db import load_pedidos, buscar_pedido_por_id, buscar_pedidos_por_produto, buscar_ids_por_produto, load_contagens, load_itens_contagem, get_opcoes_filtros
 
 st.set_page_config(
     page_title="Entrada Mercadoria",
-    page_icon="📋",
+    page_icon="ð",
     layout="wide",
 )
 
@@ -35,9 +37,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("📋 Pedidos — Movimentação e Consulta")
+st.title("ð Pedidos â MovimentaÃ§Ã£o e Consulta")
 
-# ── Carrega opções de filtro ──────────────────────────────────────────────────
+# ââ Carrega opÃ§Ãµes de filtro ââââââââââââââââââââââââââââââââââââââââââââââââââ
 @st.cache_data(ttl=120, show_spinner=False)
 def fetch_opcoes():
     return get_opcoes_filtros()
@@ -45,26 +47,26 @@ def fetch_opcoes():
 try:
     opcoes = fetch_opcoes()
 except Exception as e:
-    st.error(f"Não foi possível conectar ao banco de dados: {e}")
+    st.error(f"NÃ£o foi possÃ­vel conectar ao banco de dados: {e}")
     st.info("Verifique o arquivo `.env` com DB_HOST, DB_PORT, DB_NAME, DB_USER e DB_PASSWORD.")
     st.stop()
 
-aba_mov, aba_busca, aba_ajuste = st.tabs(["📊 Movimentação", "🔍 Buscar Pedido", "📦 Ajuste de Estoque"])
+aba_mov, aba_busca, aba_ajuste = st.tabs(["ð MovimentaÃ§Ã£o", "ð Buscar Pedido", "ð¦ Ajuste de Estoque"])
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ABA 1 — MOVIMENTAÇÃO
-# ══════════════════════════════════════════════════════════════════════════════
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ABA 1 â MOVIMENTAÃÃO
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 with aba_mov:
 
     with st.sidebar:
-        st.header("Filtros — Movimentação")
+        st.header("Filtros â MovimentaÃ§Ã£o")
 
         col_di, col_df = st.columns(2)
         with col_di:
             data_ini = st.date_input("De", value=None, key="ini")
         with col_df:
-            data_fim = st.date_input("Até", value=None, key="fim")
+            data_fim = st.date_input("AtÃ©", value=None, key="fim")
 
         sel_status = st.selectbox("Status", ["Todos"] + opcoes["status"])
         sel_tipo   = st.selectbox("Tipo de Pedido", ["Todos"] + opcoes["tipos"])
@@ -74,11 +76,11 @@ with aba_mov:
         sel_vend  = st.selectbox("Vendedor", vend_opts)
 
         st.markdown("---")
-        if st.button("🔄 Recarregar"):
+        if st.button("ð Recarregar"):
             st.cache_data.clear()
             st.rerun()
 
-    # Monta parâmetros
+    # Monta parÃ¢metros
     id_vend = None
     if sel_vend != "Todos":
         row = vend_df[vend_df["nome_vendedor"] == sel_vend]
@@ -101,7 +103,7 @@ with aba_mov:
         st.error(f"Erro ao carregar dados: {e}")
         st.stop()
 
-    # ── KPIs ──────────────────────────────────────────────────────────────────
+    # ââ KPIs ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total de pedidos",  f"{len(df):,}")
     k2.metric("Valor total",       f"R$ {df['valor_total'].sum():,.2f}")
@@ -110,7 +112,7 @@ with aba_mov:
 
     st.divider()
 
-    # ── Gráfico por status ────────────────────────────────────────────────────
+    # ââ GrÃ¡fico por status ââââââââââââââââââââââââââââââââââââââââââââââââââââ
     col_g1, col_g2 = st.columns(2)
 
     with col_g1:
@@ -133,7 +135,7 @@ with aba_mov:
             tp_df.columns = ["tipo_pedido", "total"]
             fig2 = px.pie(
                 tp_df, names="tipo_pedido", values="total",
-                title="Distribuição por Tipo",
+                title="DistribuiÃ§Ã£o por Tipo",
                 hole=0.45,
             )
             fig2.update_layout(height=320, margin=dict(t=40, b=10))
@@ -141,7 +143,7 @@ with aba_mov:
 
     st.divider()
 
-    # ── Evolução temporal ─────────────────────────────────────────────────────
+    # ââ EvoluÃ§Ã£o temporal âââââââââââââââââââââââââââââââââââââââââââââââââââââ
     if not df.empty and "data" in df.columns:
         df["data"] = pd.to_datetime(df["data"], errors="coerce")
         tempo = (
@@ -160,14 +162,14 @@ with aba_mov:
         st.plotly_chart(fig3, use_container_width=True)
         st.divider()
 
-    # ── Filtros da tabela ─────────────────────────────────────────────────────
+    # ââ Filtros da tabela âââââââââââââââââââââââââââââââââââââââââââââââââââââ
     st.subheader("Lista de Pedidos")
 
     fb1, fb2 = st.columns([3, 3])
     with fb1:
-        f_busca = st.text_input("🔎 Buscar pedido", placeholder="Digite qualquer informação: ID, cliente, observação...")
+        f_busca = st.text_input("ð Buscar pedido", placeholder="Digite qualquer informaÃ§Ã£o: ID, cliente, observaÃ§Ã£o...")
     with fb2:
-        f_produto = st.text_input("📦 Buscar por produto", placeholder="Nome ou código do produto...")
+        f_produto = st.text_input("ð¦ Buscar por produto", placeholder="Nome ou cÃ³digo do produto...")
 
     fc1, fc2, fc3, fc4, fc5, fc6 = st.columns([1, 2, 2, 2, 2, 1])
     with fc1:
@@ -186,7 +188,7 @@ with aba_mov:
     with fc6:
         st.markdown("<br>", unsafe_allow_html=True)
         st.download_button(
-            "⬇️ CSV",
+            "â¬ï¸ CSV",
             data=df.to_csv(index=False).encode("utf-8"),
             file_name="pedidos.csv",
             mime="text/csv",
@@ -211,7 +213,7 @@ with aba_mov:
     if f_vend:
         show = show[show["vendedor"].isin(f_vend)]
 
-    # formata colunas monetárias
+    # formata colunas monetÃ¡rias
     show_fmt = show.copy()
     if "valor_total" in show_fmt.columns:
         show_fmt["valor_total"] = show_fmt["valor_total"].apply(lambda v: f"R$ {float(v):,.2f}" if pd.notna(v) else "")
@@ -220,22 +222,22 @@ with aba_mov:
     st.caption(f"Exibindo {len(show):,} de {len(df):,} registros")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ABA 2 — BUSCAR PEDIDO
-# ══════════════════════════════════════════════════════════════════════════════
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ABA 2 â BUSCAR PEDIDO
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 with aba_busca:
     tipo_busca = st.radio(
         "Buscar por",
-        ["Número do Pedido", "Código do Produto"],
+        ["NÃºmero do Pedido", "CÃ³digo do Produto"],
         horizontal=True,
     )
 
     st.divider()
 
-    # ── Busca por ID do pedido ────────────────────────────────────────────────
-    if tipo_busca == "Número do Pedido":
+    # ââ Busca por ID do pedido ââââââââââââââââââââââââââââââââââââââââââââââââ
+    if tipo_busca == "NÃºmero do Pedido":
         st.subheader("Buscar Pedido por ID")
-        pid = st.number_input("Número do Pedido", min_value=1, step=1, value=None, placeholder="Digite o ID...")
+        pid = st.number_input("NÃºmero do Pedido", min_value=1, step=1, value=None, placeholder="Digite o ID...")
 
         if pid:
             try:
@@ -245,7 +247,7 @@ with aba_busca:
                 st.stop()
 
             if df_ped.empty:
-                st.warning(f"Pedido #{int(pid)} não encontrado.")
+                st.warning(f"Pedido #{int(pid)} nÃ£o encontrado.")
             else:
                 row = df_ped.iloc[0]
 
@@ -263,7 +265,7 @@ with aba_busca:
                 c7.metric("ID Rota",    str(row.get("id_rota", "-")))
 
                 if row.get("obs"):
-                    st.info(f"Observação: {row['obs']}")
+                    st.info(f"ObservaÃ§Ã£o: {row['obs']}")
                 if pd.notna(row.get("cancelado_em")):
                     st.error(f"Pedido cancelado em: {str(row['cancelado_em'])[:16]}")
 
@@ -281,12 +283,12 @@ with aba_busca:
                     st.dataframe(df_itens, use_container_width=True, hide_index=True)
                     st.caption(f"{len(df_itens)} item(ns)")
         else:
-            st.info("Digite o número do pedido acima para consultar.")
+            st.info("Digite o nÃºmero do pedido acima para consultar.")
 
-    # ── Busca por código do produto ───────────────────────────────────────────
+    # ââ Busca por cÃ³digo do produto âââââââââââââââââââââââââââââââââââââââââââ
     else:
-        st.subheader("Buscar Pedidos por Código do Produto")
-        cod = st.text_input("Código do Produto", placeholder="Ex: LDT20.0154")
+        st.subheader("Buscar Pedidos por CÃ³digo do Produto")
+        cod = st.text_input("CÃ³digo do Produto", placeholder="Ex: LDT20.0154")
 
         if cod:
             try:
@@ -296,12 +298,12 @@ with aba_busca:
                 st.stop()
 
             if df_prod.empty:
-                st.warning(f"Nenhum pedido encontrado com o código '{cod}'.")
+                st.warning(f"Nenhum pedido encontrado com o cÃ³digo '{cod}'.")
             else:
                 # resumo do produto encontrado
                 nome = df_prod["nome_produto"].iloc[0]
                 cod_real = df_prod["cod_barras"].iloc[0]
-                st.success(f"Produto: **{nome}** — Código: `{cod_real}`")
+                st.success(f"Produto: **{nome}** â CÃ³digo: `{cod_real}`")
 
                 k1, k2, k3 = st.columns(3)
                 k1.metric("Pedidos encontrados", f"{df_prod['id_pedido'].nunique():,}")
@@ -323,23 +325,23 @@ with aba_busca:
                     )
 
                 st.dataframe(show_prod, use_container_width=True, hide_index=True)
-                st.caption(f"{len(show_prod)} linha(s) — {df_prod['id_pedido'].nunique()} pedido(s)")
+                st.caption(f"{len(show_prod)} linha(s) â {df_prod['id_pedido'].nunique()} pedido(s)")
         else:
-            st.info("Digite o código do produto acima para consultar.")
+            st.info("Digite o cÃ³digo do produto acima para consultar.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ABA 3 — AJUSTE DE ESTOQUE
-# ══════════════════════════════════════════════════════════════════════════════
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ABA 3 â AJUSTE DE ESTOQUE
+# ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 with aba_ajuste:
     st.subheader("Contagens e Ajustes de Estoque")
 
-    # ── Filtros ───────────────────────────────────────────────────────────────
+    # ââ Filtros âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     fa1, fa2, fa3 = st.columns([2, 2, 2])
     with fa1:
         aj_di = st.date_input("De", value=None, key="aj_ini")
     with fa2:
-        aj_df = st.date_input("Até", value=None, key="aj_fim")
+        aj_df = st.date_input("AtÃ©", value=None, key="aj_fim")
     with fa3:
         aj_status = st.selectbox("Status", ["Todos", "FINALIZADA", "EM_ANDAMENTO", "PENDENTE"], key="aj_st")
 
@@ -357,17 +359,17 @@ with aba_ajuste:
         st.error(f"Erro ao carregar contagens: {e}")
         st.stop()
 
-    # ── KPIs ──────────────────────────────────────────────────────────────────
+    # ââ KPIs ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total de contagens",    f"{len(df_cont):,}")
     k2.metric("Total de itens",        f"{df_cont['total_itens'].sum():,.0f}")
-    k3.metric("Itens com divergência", f"{df_cont['itens_divergentes'].sum():,.0f}")
+    k3.metric("Itens com divergÃªncia", f"{df_cont['itens_divergentes'].sum():,.0f}")
     saldo = float(df_cont['saldo_ajuste'].sum()) if not df_cont.empty else 0
     k4.metric("Saldo de ajuste",       f"{saldo:+,.0f} un.")
 
     st.divider()
 
-    # ── Lista de contagens ────────────────────────────────────────────────────
+    # ââ Lista de contagens ââââââââââââââââââââââââââââââââââââââââââââââââââââ
     st.subheader("Lista de Contagens")
 
     if df_cont.empty:
@@ -381,14 +383,14 @@ with aba_ajuste:
 
         st.divider()
 
-        # ── Detalhe de uma contagem ───────────────────────────────────────────
+        # ââ Detalhe de uma contagem âââââââââââââââââââââââââââââââââââââââââââ
         st.subheader("Detalhe da Contagem")
 
         ids_disponiveis = df_cont["id"].tolist()
         id_sel = st.selectbox(
             "Selecione a contagem",
             ids_disponiveis,
-            format_func=lambda x: f"#{x} — {df_cont[df_cont['id']==x]['obs'].values[0] or 'sem obs.'} ({df_cont[df_cont['id']==x]['data'].values[0]})",
+            format_func=lambda x: f"#{x} â {df_cont[df_cont['id']==x]['obs'].values[0] or 'sem obs.'} ({df_cont[df_cont['id']==x]['data'].values[0]})",
         )
 
         if id_sel:
@@ -408,11 +410,11 @@ with aba_ajuste:
 
                 d1, d2, d3, d4 = st.columns(4)
                 d1.metric("Total de itens",   f"{total_itens:,}")
-                d2.metric("Com divergência",  f"{com_div:,}")
-                d3.metric("Sobra (física>sistema)", f"{positivos:,}")
-                d4.metric("Falta (física<sistema)", f"{negativos:,}")
+                d2.metric("Com divergÃªncia",  f"{com_div:,}")
+                d3.metric("Sobra (fÃ­sica>sistema)", f"{positivos:,}")
+                d4.metric("Falta (fÃ­sica<sistema)", f"{negativos:,}")
 
-                # gráfico top divergências
+                # grÃ¡fico top divergÃªncias
                 top = df_itens_cont[df_itens_cont["diferenca"] != 0].head(20).copy()
                 if not top.empty:
                     top["cor"] = top["diferenca"].apply(lambda v: "Sobra" if v > 0 else "Falta")
@@ -424,8 +426,8 @@ with aba_ajuste:
                         color="cor",
                         color_discrete_map={"Sobra": "#27AE60", "Falta": "#E74C3C"},
                         text="diferenca",
-                        title="Top divergências (física − sistema)",
-                        labels={"diferenca": "Diferença", "nome_produto": "", "cor": ""},
+                        title="Top divergÃªncias (fÃ­sica â sistema)",
+                        labels={"diferenca": "DiferenÃ§a", "nome_produto": "", "cor": ""},
                     )
                     fig_div.update_traces(textposition="outside", texttemplate="%{text:+.0f}")
                     fig_div.update_layout(height=max(300, len(top) * 30), margin=dict(t=40, b=10, l=10, r=80))
@@ -434,7 +436,7 @@ with aba_ajuste:
                 # tabela detalhada com highlight
                 st.subheader("Itens da Contagem")
 
-                busca_item = st.text_input("Buscar produto", placeholder="Nome ou código...", key="busca_item")
+                busca_item = st.text_input("Buscar produto", placeholder="Nome ou cÃ³digo...", key="busca_item")
                 df_show_item = df_itens_cont.copy()
                 if busca_item:
                     mask = df_show_item.astype(str).apply(lambda c: c.str.contains(busca_item, case=False, na=False)).any(axis=1)
@@ -452,5 +454,5 @@ with aba_ajuste:
                 st.dataframe(styled_itens, use_container_width=True, height=420, hide_index=True)
                 st.caption(
                     f"Exibindo {len(df_show_item):,} de {total_itens:,} itens  |  "
-                    "Verde = sobra · Vermelho = falta"
+                    "Verde = sobra Â· Vermelho = falta"
                 )
