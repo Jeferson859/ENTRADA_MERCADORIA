@@ -12,6 +12,10 @@ st.set_page_config(page_title="Estoque", page_icon="📦", layout="wide")
 import auth
 auth.protect()
 
+if st.button("🔄 Atualizar agora"):
+    st.cache_data.clear()
+    st.rerun()
+
 LEAD_TIME_DIAS = 15  # prazo médio de reposição
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
@@ -60,15 +64,15 @@ def kpi(col, label, value, color=CYAN, sub=None):
             unsafe_allow_html=True)
 
 # ── DADOS ─────────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def fetch_empresas():
     return load_empresas()
 
-@st.cache_data(ttl=600, show_spinner="Calculando giro de estoque...")
+@st.cache_data(ttl=120, show_spinner="Calculando giro de estoque...")
 def fetch_giro(dias, id_empresa):
     return load_giro_estoque(dias, id_empresa)
 
-@st.cache_data(ttl=600, show_spinner="Calculando idade do estoque...")
+@st.cache_data(ttl=120, show_spinner="Calculando idade do estoque...")
 def fetch_idade(id_empresa):
     return load_idade_estoque(id_empresa)
 
@@ -87,7 +91,7 @@ st.markdown(
     f'## 📦 Estoque — Giro, ABC e Compras&nbsp;&nbsp;'
     f'<span style="font-size:.75rem;color:#8B92A5;font-weight:400">'
     f'Atualizado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
-    f' · saídas: PRE-VENDA + BRINDE + REPOSICAO · cache 10 min</span>',
+    f' · saídas: PRE-VENDA + BRINDE + REPOSICAO · cache 2 min</span>',
     unsafe_allow_html=True)
 
 fc0, fc1, fc2, fc3 = st.columns([3, 2, 2, 3])
