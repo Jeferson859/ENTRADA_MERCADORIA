@@ -178,11 +178,17 @@ if preset == "Personalizado":
                    f"{f_fim.strftime('%d/%m/%y') if f_fim else 'hoje'}")
 
 st.markdown(
-    f'## 📊 Dashboard de Vendas — SGV&nbsp;&nbsp;'
-    f'<span style="font-size:.75rem;color:#8B92A5;font-weight:400">'
-    f'Atualizado em: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
-    f' · PRE-VENDA válidos · período: {periodo_txt} · cache 10 min</span>',
-    unsafe_allow_html=True)
+    """
+    <div style="display:flex;align-items:center;gap:14px;margin:.1rem 0 .4rem">
+      <div style="width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,#2E7CF6,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:23px;box-shadow:0 6px 20px rgba(46,124,246,.35)">📊</div>
+      <div>
+        <div style="font-size:21px;font-weight:800;letter-spacing:-.02em;color:#F2F6FC">Dashboard de Vendas — SGV</div>
+        <div style="font-size:12px;color:#6B7385;font-weight:500;margin-top:2px">PRE-VENDA válidos · período: histórico completo · cache 10 min</div>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 tabs = st.tabs(["🛣️ Rotas","👥 Faixa Etária",
                 "🧑‍💼 Vendedor × Estado","🎁 Produtos BRINDE","🛒 Produtos PRE-VENDA"])
