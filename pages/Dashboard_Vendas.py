@@ -18,6 +18,8 @@ from db import (
 )
 
 st.set_page_config(page_title="Dashboard de Vendas", page_icon="📊", layout="wide")
+import nav
+nav.render("Vendas")
 
 st.markdown(
     """
