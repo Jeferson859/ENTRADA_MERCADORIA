@@ -42,13 +42,7 @@ st.markdown(
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""<style>
 .block-container{padding-top:2.4rem;padding-bottom:.5rem;max-width:100%}
-.kpi-card{
-  background:linear-gradient(135deg,rgba(123,97,255,.13) 0%,rgba(0,212,255,.07) 100%);
-  border:1px solid rgba(123,97,255,.35);border-radius:14px;
-  padding:1rem 1.3rem;display:flex;justify-content:space-between;
-  align-items:flex-end;min-height:90px;margin-bottom:.5rem;
-  transition:border-color .2s;
-}
+.kpi-card{position:relative;background:linear-gradient(155deg,rgba(59,169,255,.09),rgba(0,212,255,.025));border:1px solid rgba(59,169,255,.16);border-top:3px solid #2E7CF6;border-radius:14px;padding:15px 16px}
 .kpi-card:hover{border-color:rgba(0,212,255,.6)}
 .kpi-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;
   color:#8B92A5;margin-bottom:.3rem}
