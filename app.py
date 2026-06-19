@@ -10,6 +10,8 @@ st.set_page_config(
     page_icon="📋",
     layout="wide",
 )
+import nav
+nav.render("Pedidos")
 
 st.markdown(
     """
