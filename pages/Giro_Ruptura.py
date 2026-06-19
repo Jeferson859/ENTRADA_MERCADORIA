@@ -16,6 +16,8 @@ from db_giro_ruptura import (
 )
 
 st.set_page_config(page_title="Giro & Ruptura", page_icon="📦", layout="wide")
+import nav
+nav.render("Estoque")
 
 st.markdown(
     """
