@@ -37,7 +37,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("📋 Pedidos — Movimentação e Consulta")
+st.markdown(
+    """
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;margin:.1rem 0 .5rem">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,#2E7CF6,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:23px;box-shadow:0 6px 20px rgba(46,124,246,.35)">📋</div>
+        <div>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-.02em;color:#F2F6FC">Pedidos — Movimentação &amp; Consulta</div>
+          <div style="font-size:12px;color:#6B7385;font-weight:500;margin-top:2px">Entrada de mercadoria · movimentação, busca e ajuste de estoque</div>
+        </div>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ── Carrega opções de filtro ──────────────────────────────────────────────────
 @st.cache_data(ttl=120, show_spinner=False)
@@ -104,11 +117,29 @@ with aba_mov:
         st.stop()
 
     # ── KPIs ──────────────────────────────────────────────────────────────────
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total de pedidos",  f"{len(df):,}")
-    k2.metric("Valor total",       f"R$ {df['valor_total'].sum():,.2f}")
-    k3.metric("Cancelados",        f"{df['cancelado_em'].notna().sum():,}")
-    k4.metric("Tipos distintos",   f"{df['tipo_pedido'].nunique()}")
+    _total = len(df)
+    _valor = float(df["valor_total"].sum())
+    _canc = int(df["cancelado_em"].notna().sum())
+    _tipos = int(df["tipo_pedido"].nunique())
+    _ticket = (_valor / _total) if _total else 0
+    _abertos = int((~df["status"].isin(["CANCELADO", "ESTORNADO"])).sum()) if "status" in df.columns else 0
+    _kpis = [
+        ("Total de pedidos", format(_total, ",").replace(",", "."), "#2E7CF6", "no período"),
+        ("Valor total", "R$ " + format(int(_valor), ",").replace(",", "."), "#00D4FF", "soma dos pedidos"),
+        ("Ticket médio", "R$ " + format(int(_ticket), ",").replace(",", "."), "#7B8BFF", "valor / pedidos"),
+        ("Cancelados", format(_canc, ",").replace(",", "."), "#FF5C6C", "cancelado_em preenchido"),
+        ("Em aberto", format(_abertos, ",").replace(",", "."), "#00E0A1", "não cancelados/estornados"),
+        ("Tipos distintos", str(_tipos), "#FFC53D", "tipos de pedido"),
+    ]
+    _cards = '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px">'
+    for _l, _v, _c, _s in _kpis:
+        _cards += ('<div style="position:relative;overflow:hidden;background:linear-gradient(155deg,rgba(59,169,255,.09),rgba(0,212,255,.025));border:1px solid rgba(59,169,255,.16);border-radius:14px;padding:15px 16px;min-height:100px;display:flex;flex-direction:column;justify-content:space-between">'
+                   '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:' + _c + '"></div>'
+                   '<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;font-weight:600">' + _l + '</div>'
+                   '<div><div style="font-size:26px;font-weight:800;line-height:1;color:' + _c + ';font-variant-numeric:tabular-nums">' + _v + '</div>'
+                   '<div style="font-size:10.5px;color:#5E6678;margin-top:5px">' + _s + '</div></div></div>')
+    _cards += '</div>'
+    st.markdown(_cards, unsafe_allow_html=True)
 
     st.divider()
 
