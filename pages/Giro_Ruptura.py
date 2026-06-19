@@ -1,67 +1,13 @@
 # encoding: utf-8
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime
 
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db import load_empresas, load_giro_estoque, load_colunas, load_idade_estoque
-
-st.set_page_config(page_title="Giro & Ruptura", page_icon="📦", layout="wide")
-
-
-LEAD_TIME_DIAS = 15  # prazo médio de reposição
-
-# ── CSS ───────────────────────────────────────────────────────────────────────
-st.markdown("""<style>
-.block-container{padding-top:2.4rem;padding-bottom:.5rem;max-width:100%}
-.kpi-card{
-  background:linear-gradient(135deg,rgba(123,97,255,.13) 0%,rgba(0,212,255,.07) 100%);
-  border:1px solid rgba(123,97,255,.35);border-radius:14px;
-  padding:1rem 1.3rem;display:flex;justify-content:space-between;
-  align-items:flex-end;min-height:90px;margin-bottom:.5rem;
-  transition:border-color .2s;
-}
-.kpi-card:hover{border-color:rgba(0,212,255,.6)}
-.kpi-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;
-  color:#8B92A5;margin-bottom:.3rem}
-.kpi-value{font-size:1.85rem;font-weight:800;color:#fff;
-  letter-spacing:-.02em;line-height:1}
-.kpi-sub{font-size:.7rem;color:#8B92A5;margin-top:.2rem}
-.stTabs [data-baseweb="tab-list"]{gap:5px;background:rgba(255,255,255,.04);
-  padding:5px;border-radius:12px;margin-bottom:.5rem}
-.stTabs [data-baseweb="tab"]{padding:7px 20px;border-radius:8px;
-  font-size:.82rem;font-weight:500;letter-spacing:.02em}
-h3{font-size:.8rem!important;text-transform:uppercase;letter-spacing:.09em;
-  color:#8B92A5!important;margin:.1rem 0 .5rem 0!important;
-  padding-bottom:.35rem;border-bottom:1px solid rgba(123,97,255,.28)}
-hr{border-color:rgba(123,97,255,.15)!important;margin:.6rem 0!important}
-</style>""", unsafe_allow_html=True)
-
-PURPLE = "#7B61FF"; CYAN = "#00D4FF"; GREEN = "#00FF94"
-AMBER = "#FFB800"; RED = "#FF6B6B"
-PL = dict(
-    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#C4C9D4", size=11, family="Inter,sans-serif"),
-    margin=dict(l=0,r=4,t=30,b=0),
-)
-COR_CLASSE = {'A': GREEN, 'B': AMBER, 'C': '#8B92A5'}
-
-def kpi(col, label, value, color=CYAN, sub=None):
-    sub_h = f'<div class="kpi-sub">{sub}</div>' if sub else ""
-    with col:
-        st.markdown(
-            f'<div class="kpi-card">'
-            f'<div><div class="kpi-label">{label}</div>'
-            f'<div class="kpi-value" style="color:{color}">{value}</div>{sub_h}</div>'
-            f'</div>',
-            unsafe_allow_html=True)
-
-# ── DADOS ─────────────────────────────────────────────────────────────────────
-
-
-# ── Giro & Ruptura: dados consolidados ──
+from db import load_empresas, load_idade_estoque
 from db_giro_ruptura import (
     load_giro_ruptura,
     kpis_giro_ruptura,
@@ -69,144 +15,193 @@ from db_giro_ruptura import (
     classe_a_em_risco,
 )
 
+st.set_page_config(page_title="Giro & Ruptura", page_icon="📦", layout="wide")
+
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    .stApp { background: radial-gradient(1200px 600px at 80% -10%, rgba(46,124,246,.10), transparent 60%), #070B12; }
+    html, body, [class*="css"] { font-family:'Inter',system-ui,sans-serif; color:#D7DEEA; }
+    .block-container { padding-top:1.4rem; max-width:1440px; }
+    div[data-baseweb="select"] > div, .stTextInput input { background:#0E1422 !important; border:1px solid rgba(59,169,255,.2) !important; color:#E4EAF3 !important; border-radius:10px !important; }
+    .stTextInput input::placeholder { color:#4A5365; }
+    .stRadio [role="radiogroup"] { gap:4px; background:#0E1422; border:1px solid rgba(59,169,255,.2); padding:4px; border-radius:11px; }
+    .stTabs [data-baseweb="tab-list"] { gap:5px; background:rgba(255,255,255,.03); padding:5px; border-radius:12px; }
+    .stTabs [data-baseweb="tab"] { border-radius:9px; padding:6px 16px; color:#9AA3B4; }
+    .stTabs [aria-selected="true"] { background:linear-gradient(150deg,#2E7CF6,#00D4FF); color:#fff !important; }
+    .stDataFrame { border:1px solid rgba(59,169,255,.16); border-radius:12px; }
+    .stSelectbox label, .stRadio label, .stSlider label, .stTextInput label { color:#6B7385 !important; font-size:10.5px !important; text-transform:uppercase; letter-spacing:.09em; font-weight:600 !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+STATUS_STYLE = {
+    "Sem estoque":   ("#FF5C6C", "rgba(255,92,108,.12)", "rgba(255,92,108,.3)"),
+    "Risco ruptura": ("#FF8A4C", "rgba(255,138,76,.12)", "rgba(255,138,76,.3)"),
+    "Parado":        ("#8B92A5", "rgba(139,146,165,.12)", "rgba(139,146,165,.3)"),
+    "Excesso":       ("#FFC53D", "rgba(255,197,61,.12)", "rgba(255,197,61,.3)"),
+    "Saudável":      ("#00E0A1", "rgba(0,224,161,.12)", "rgba(0,224,161,.3)"),
+}
+CLASSE_COR = {"A": "#00E0A1", "B": "#FFC53D", "C": "#7B8499"}
+CLASSE_BG = {"A": "rgba(0,224,161,.14)", "B": "rgba(255,197,61,.14)", "C": "rgba(123,132,153,.14)"}
+
 
 @st.cache_data(ttl=120, show_spinner=False)
-def fetch_empresas_gr():
+def _empresas():
     return load_empresas()
 
 
 @st.cache_data(ttl=120, show_spinner="Calculando giro e ruptura...")
-def fetch_giro_ruptura(dias, lead, id_emp):
+def _data(dias, lead, id_emp):
     return load_giro_ruptura(dias=dias, lead_time=lead, id_empresa=id_emp)
 
 
-STT_COR = {
-    "Risco ruptura": "#f59e0b",
-    "Sem estoque": "#ef4444",
-    "Parado": "#9ca3af",
-    "Excesso": "#3b82f6",
-    "Saudável": "#22c55e",
-}
-
-hc1, hc2 = st.columns([8, 1])
-hc1.markdown(
-    '<div style="display:flex;align-items:center;gap:.6rem;margin:.2rem 0 .4rem">'
-    '<span style="font-size:1.9rem">📦</span><div>'
-    '<div style="font-size:1.7rem;font-weight:800;color:#fff;line-height:1.1">Estoque — Giro &amp; Ruptura</div>'
-    '<div style="color:#8892A5;font-size:.8rem">Cobertura, curva ABC e tempo parado · '
-    'saídas PRE-VENDA + BRINDE + REPOSIÇÃO · cache 2 min</div></div></div>',
+hcol, bcol = st.columns([8, 1.3])
+hcol.markdown(
+    """
+    <div style="display:flex;align-items:center;gap:14px;margin:.1rem 0">
+      <div style="width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,#2E7CF6,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:23px;box-shadow:0 6px 20px rgba(46,124,246,.35)">📦</div>
+      <div>
+        <div style="font-size:21px;font-weight:800;letter-spacing:-.02em;color:#F2F6FC">Estoque — Giro &amp; Ruptura</div>
+        <div style="font-size:12px;color:#6B7385;font-weight:500;margin-top:2px">Cobertura, curva ABC e tempo parado · saídas PRE-VENDA + BRINDE + REPOSIÇÃO · cache 2 min</div>
+      </div>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
-with hc2:
-    if st.button("🔄 Recarregar"):
+with bcol:
+    st.write("")
+    if st.button("↻ Recarregar", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-empresas = fetch_empresas_gr()
-fc1, fc2, fc3, fc4 = st.columns([2, 1.5, 1.5, 2])
-emp = fc1.selectbox("EMPRESA", empresas["nome_empresa"])
+empresas = _empresas()
+f1, f2, f3, f4 = st.columns([2, 1.5, 1.5, 2])
+emp = f1.selectbox("🏢 Empresa", empresas["nome_empresa"])
 id_emp = int(empresas.loc[empresas["nome_empresa"] == emp, "id_empresa"].iloc[0])
-dias = fc2.radio("JANELA DE SAÍDA", [30, 60, 90], horizontal=True)
-lead = fc3.slider("PRAZO DE REPOSIÇÃO (dias)", 5, 45, 15, step=5)
-busca = fc4.text_input("BUSCAR PRODUTO", "", placeholder="Nome do produto...")
+dias = f2.radio("Janela de saída", [30, 60, 90], horizontal=True)
+lead = f3.slider("Prazo de reposição (dias)", 5, 45, 15, step=5)
+busca = f4.text_input("Buscar produto", "", placeholder="Nome do produto...")
 
-df = fetch_giro_ruptura(dias, lead, id_emp)
+df = _data(dias, lead, id_emp)
 dfv = df[df["produto"].str.contains(busca, case=False, na=False)] if busca else df
 
-
-def _chip(label, n, cor):
-    return (
-        '<span style="display:inline-flex;align-items:center;gap:6px;background:#1b2233;'
-        'border:1px solid #2a3650;border-radius:20px;padding:4px 12px;margin:0 6px 6px 0;'
-        f'font-size:.8rem;color:#cdd6e5"><span style="width:8px;height:8px;border-radius:50%;'
-        f'background:{cor}"></span>{label} <b style="color:#fff">{n}</b></span>'
-    )
-
-
-chips = '<div style="margin:.3rem 0 .7rem"><span style="color:#8892A5;font-size:.72rem;letter-spacing:.08em;margin-right:4px">STATUS</span>'
-for s, c in STT_COR.items():
-    chips += _chip(s, int((df["status"] == s).sum()), c)
-chips += '<span style="color:#8892A5;font-size:.72rem;letter-spacing:.08em;margin:0 4px 0 14px">CLASSE</span>'
+chips = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 16px">'
+chips += '<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#5A6275;font-weight:600;margin-right:2px">Status</span>'
+for s, (fg, bg, brd) in STATUS_STYLE.items():
+    n = int((df["status"] == s).sum())
+    chips += ('<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid ' + brd + ';background:' + bg + ';color:' + fg +
+              ';font-size:12px;font-weight:600;padding:6px 11px;border-radius:20px"><span style="width:7px;height:7px;border-radius:50%;background:' + fg + '"></span>' + s +
+              ' <span style="opacity:.6">' + str(n) + '</span></span>')
+chips += '<span style="width:1px;height:18px;background:rgba(255,255,255,.1);margin:0 4px"></span>'
+chips += '<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#5A6275;font-weight:600;margin-right:2px">Classe</span>'
 for cl in ["A", "B", "C"]:
-    chips += _chip(f"Classe {cl}", int((df["classe"] == cl).sum()), "#8892A5")
-chips += "</div>"
+    n = int((df["classe"] == cl).sum())
+    chips += ('<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.12);background:' + CLASSE_BG[cl] +
+              ';color:' + CLASSE_COR[cl] + ';font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px">Classe ' + cl +
+              ' <span style="opacity:.6;font-weight:600">' + str(n) + '</span></span>')
+chips += '</div>'
 st.markdown(chips, unsafe_allow_html=True)
 
 k = kpis_giro_ruptura(df)
-kc = st.columns(5)
-kpi(kc[0], "RISCO DE RUPTURA", str(k["risco_ruptura"]), color=RED, sub=f"rompem em ≤ {lead}d")
-kpi(kc[1], "SEM ESTOQUE", str(k["sem_estoque"]), color=AMBER, sub="vendendo com saldo zerado")
-kpi(kc[2], "GIRO GERAL", f'{k["giro_geral"]}x', color=CYAN, sub=f"saída ÷ estoque · {dias}d")
-kpi(kc[3], "COBERTURA MEDIANA", f'{k["cobertura_mediana"]}d', color=CYAN, sub="dias de estoque restante")
-kpi(kc[4], "CLASSE A EM RISCO", str(k["classe_a_risco"]), color=AMBER, sub="alto giro rompendo")
+KPIS = [
+    ("Risco de ruptura", str(k["risco_ruptura"]), "#FF8A4C", "rompem em <= " + str(lead) + "d"),
+    ("Sem estoque", str(k["sem_estoque"]), "#FF5C6C", "vendendo com saldo zerado"),
+    ("Giro geral", str(k["giro_geral"]) + "x", "#00D4FF", "saída / estoque · " + str(dias) + "d"),
+    ("Cobertura mediana", str(k["cobertura_mediana"]) + "d", "#3BA9FF", "dias de estoque restante"),
+    ("Classe A em risco", str(k["classe_a_risco"]), "#FFC53D", "alto giro rompendo"),
+]
+cards = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px">'
+for label, val, cor, sub in KPIS:
+    cards += ('<div style="position:relative;overflow:hidden;background:linear-gradient(155deg,rgba(59,169,255,.09),rgba(0,212,255,.025));'
+              'border:1px solid rgba(59,169,255,.16);border-radius:14px;padding:15px 16px;min-height:104px;display:flex;flex-direction:column;justify-content:space-between">'
+              '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:' + cor + '"></div>'
+              '<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;font-weight:600;line-height:1.3">' + label + '</div>'
+              '<div><div style="font-size:29px;font-weight:800;letter-spacing:-.02em;line-height:1;color:' + cor + ';font-variant-numeric:tabular-nums">' + val + '</div>'
+              '<div style="font-size:10.5px;color:#5E6678;margin-top:5px">' + sub + '</div></div></div>')
+cards += '</div>'
+st.markdown(cards, unsafe_allow_html=True)
 
-st.write("")
+SECT = 'background:rgba(255,255,255,.025);border:1px solid rgba(59,169,255,.16);border-radius:16px;padding:18px 20px'
+TITLE = 'font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9CC6FF;font-weight:700'
+
 tab1, tab2, tab3 = st.tabs(["📊 Giro & Cobertura", "🔢 Curva ABC", "⏰ Tempo Parado"])
 
 with tab1:
-    cL, cR = st.columns(2)
-    with cL:
-        st.markdown("##### ⏱️ RUNWAY DE RUPTURA")
-        st.caption(f"Produtos que rompem primeiro · linha = prazo de reposição ({lead}d)")
-        zer = int((df["status"] == "Sem estoque").sum())
-        if zer:
-            st.error(f"{zer} produto(s) já zeraram e seguem vendendo — comprar primeiro.")
-        rw = runway_ruptura(dfv)
-        st.dataframe(
-            rw[["produto", "estoque", "saida_periodo", "cobertura_dias", "status"]],
-            use_container_width=True, hide_index=True,
-        )
+    cL, cR = st.columns([1, 1.25])
+    rw = runway_ruptura(dfv)
+    scale = max(lead * 3, 1)
+    zer = int((df["status"] == "Sem estoque").sum())
+    html = '<div style="' + SECT + '"><div style="' + TITLE + '">⏳ Runway de ruptura</div>'
+    html += '<div style="font-size:11px;color:#5E6678;margin:3px 0 14px">Os produtos que rompem primeiro · linha tracejada = prazo de reposição (' + str(lead) + 'd)</div>'
+    if zer:
+        html += ('<div style="background:rgba(255,92,108,.1);border:1px solid rgba(255,92,108,.3);border-radius:9px;padding:8px 11px;font-size:11.5px;color:#FF8A99;margin-bottom:13px"><b style="color:#FF5C6C">' + str(zer) + '</b> produto(s) já zeraram e seguem vendendo — comprar primeiro.</div>')
+    html += '<div style="display:flex;flex-direction:column;gap:9px">'
+    for _, r in rw.iterrows():
+        cob = float(r["cobertura_dias"]) if pd.notna(r["cobertura_dias"]) else 0.0
+        w = min(cob / scale * 100, 100)
+        fg = STATUS_STYLE.get(r["status"], ("#8B92A5", "", ""))[0]
+        nome = str(r["produto"])
+        short = (nome[:24] + "…") if len(nome) > 24 else nome
+        ws = ("%.1f" % w)
+        html += ('<div style="display:grid;grid-template-columns:135px 1fr;gap:11px;align-items:center">'
+                 '<div style="font-size:11.5px;color:#AEB6C6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + nome + '">' + short + '</div>'
+                 '<div style="position:relative;height:22px;background:rgba(255,255,255,.04);border-radius:7px">'
+                 '<div style="position:absolute;left:0;top:0;bottom:0;width:' + ws + '%;background:' + fg + ';border-radius:7px;min-width:3px"></div>'
+                 '<div style="position:absolute;left:33.33%;top:0;bottom:0;border-left:1.5px dashed rgba(255,92,108,.65)"></div>'
+                 '<div style="position:absolute;left:calc(' + ws + '% + 7px);top:50%;transform:translateY(-50%);font-size:10.5px;font-weight:700;color:#C4CCDA">' + ("%.0f" % cob) + 'd</div>'
+                 '</div></div>')
+    html += '</div></div>'
+    cL.markdown(html, unsafe_allow_html=True)
     with cR:
-        st.markdown("##### 🎯 MATRIZ GIRO × COBERTURA")
-        st.caption("Cada bolha = um produto · tamanho = estoque · cor = status")
-        mtx = dfv.dropna(subset=["cobertura_dias"])
+        st.markdown('<div style="' + TITLE + ';margin-bottom:2px">🎯 Matriz Giro × Cobertura</div><div style="font-size:11px;color:#5E6678;margin-bottom:4px">Cada bolha = um produto · tamanho = estoque · cor = status</div>', unsafe_allow_html=True)
+        mtx = dfv.dropna(subset=["cobertura_dias"]).copy()
+        mtx["cob_plot"] = mtx["cobertura_dias"].clip(upper=120)
         fig = go.Figure()
-        for s, c in STT_COR.items():
+        for s, (fg, bg, brd) in STATUS_STYLE.items():
             g = mtx[mtx["status"] == s]
             if len(g):
-                fig.add_trace(go.Scatter(
-                    x=g["media_dia"], y=g["cobertura_dias"].clip(upper=120), mode="markers", name=s,
-                    marker=dict(size=(g["estoque"] ** 0.5).clip(7, 38), color=c, line=dict(width=0), opacity=0.85),
-                    text=g["produto"],
-                    hovertemplate="%{text}<br>demanda %{x}/dia<br>cobertura %{y}d<extra></extra>",
-                ))
-        fig.add_hline(y=lead, line_dash="dot", line_color="#ef4444")
-        fig.update_layout(
-            template="plotly_dark", height=430, showlegend=True,
+                fig.add_trace(go.Scatter(x=g["cob_plot"], y=g["media_dia"], mode="markers", name=s,
+                    marker=dict(size=(g["estoque"] ** 0.5).clip(7, 36), color=fg, line=dict(width=0), opacity=0.8),
+                    text=g["produto"], hovertemplate="%{text}<br>cobertura %{x}d · demanda %{y}/dia<extra></extra>"))
+        fig.add_vrect(x0=0, x1=lead, fillcolor="rgba(255,92,108,.12)", line_width=0)
+        fig.add_vline(x=lead, line_dash="dash", line_color="rgba(255,92,108,.6)")
+        fig.add_vline(x=90, line_dash="dash", line_color="rgba(255,197,61,.4)")
+        fig.update_layout(template="plotly_dark", height=360, showlegend=True,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="Demanda (un/dia)", yaxis=dict(title="Cobertura (dias)", range=[0, 125]),
-            legend=dict(orientation="h", y=-0.2), margin=dict(l=10, r=10, t=10, b=10),
-        )
+            xaxis=dict(title="Cobertura (dias)", range=[0, 122]), yaxis=dict(title="Demanda (un/dia)"),
+            legend=dict(orientation="h", y=-0.25), margin=dict(l=10, r=10, t=6, b=6))
         st.plotly_chart(fig, use_container_width=True)
+    st.markdown('<div style="' + TITLE + ';margin:8px 0 8px">Visão completa · ' + str(emp) + ' — ' + str(len(dfv)) + ' de ' + str(len(df)) + ' produtos</div>', unsafe_allow_html=True)
+    st.dataframe(dfv[["produto", "classe", "estoque", "saida_periodo", "media_dia", "giro", "cobertura_dias", "status"]],
+        use_container_width=True, hide_index=True, height=360,
+        column_config={"produto": "Produto", "classe": "ABC", "estoque": "Estoque", "saida_periodo": "Saída",
+            "media_dia": "Méd/dia", "giro": "Giro", "cobertura_dias": "Cobertura (d)", "status": "Status"})
 
 with tab2:
-    st.markdown("##### 🔢 CURVA ABC")
-    abc = (
-        df.groupby("classe")
-          .agg(produtos=("produto", "count"), saida=("saida_periodo", "sum"))
-          .reindex(["A", "B", "C"]).fillna(0).reset_index()
-    )
+    st.markdown('<div style="' + TITLE + ';margin-bottom:10px">🔢 Curva ABC</div>', unsafe_allow_html=True)
+    abc = (df.groupby("classe").agg(produtos=("produto", "count"), saida=("saida_periodo", "sum")).reindex(["A", "B", "C"]).fillna(0).reset_index())
     cc = st.columns(3)
-    cores_abc = [GREEN, AMBER, RED]
     for i in range(len(abc)):
         row = abc.iloc[i]
-        kpi(cc[i], f"CLASSE {row['classe']}", str(int(row["produtos"])),
-            color=cores_abc[i], sub=f"{int(row['saida'])} un. de saída")
-    fig2 = go.Figure(go.Bar(x=abc["classe"], y=abc["saida"], marker_color=cores_abc))
-    fig2.update_layout(template="plotly_dark", height=300, paper_bgcolor="rgba(0,0,0,0)",
-                       plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10),
-                       yaxis_title="Saída no período")
+        cl = row["classe"]
+        cc[i].markdown('<div style="background:linear-gradient(155deg,rgba(59,169,255,.09),rgba(0,212,255,.025));border:1px solid rgba(59,169,255,.16);border-top:3px solid ' + CLASSE_COR[cl] + ';border-radius:14px;padding:15px 16px">'
+            '<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#7B8499;font-weight:600">Classe ' + cl + '</div>'
+            '<div style="font-size:29px;font-weight:800;color:' + CLASSE_COR[cl] + '">' + str(int(row["produtos"])) + '</div>'
+            '<div style="font-size:10.5px;color:#5E6678">' + str(int(row["saida"])) + ' un. de saída</div></div>', unsafe_allow_html=True)
+    st.write("")
+    fig2 = go.Figure(go.Bar(x=abc["classe"], y=abc["saida"], marker_color=[CLASSE_COR[c] for c in abc["classe"]]))
+    fig2.update_layout(template="plotly_dark", height=300, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10), yaxis_title="Saída no período")
     st.plotly_chart(fig2, use_container_width=True)
-    st.markdown("###### 🚨 Classe A em risco")
-    st.dataframe(
-        classe_a_em_risco(dfv)[["produto", "estoque", "cobertura_dias", "status"]],
-        use_container_width=True, hide_index=True,
-    )
+    st.markdown('<div style="' + TITLE + ';margin:6px 0 8px">🚨 Classe A em risco</div>', unsafe_allow_html=True)
+    st.dataframe(classe_a_em_risco(dfv)[["produto", "estoque", "cobertura_dias", "status"]], use_container_width=True, hide_index=True)
 
 with tab3:
-    st.markdown("##### ⏰ TEMPO PARADO")
+    st.markdown('<div style="' + TITLE + ';margin-bottom:10px">⏰ Tempo Parado</div>', unsafe_allow_html=True)
     try:
         idade = load_idade_estoque(id_emp)
         st.dataframe(idade, use_container_width=True, hide_index=True)
     except Exception as exc:
-        st.info(f"Tempo parado indisponível: {exc}")
+        st.info("Tempo parado indisponível: " + str(exc))
