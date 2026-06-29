@@ -53,9 +53,9 @@ CLASSE_BG = {"A": "rgba(0,224,161,.14)", "B": "rgba(255,197,61,.14)", "C": "rgba
 def _sty(d):
     s = d.style
     if "status" in d.columns:
-        s = s.applymap(lambda v: "color:" + STATUS_STYLE.get(v, ("#D7DEEA", "", ""))[0] + ";font-weight:600", subset=["status"])
+        s = s.map(lambda v: "color:" + STATUS_STYLE.get(v, ("#D7DEEA", "", ""))[0] + ";font-weight:600", subset=["status"])
     if "classe" in d.columns:
-        s = s.applymap(lambda v: "color:" + CLASSE_COR.get(v, "#D7DEEA") + ";font-weight:700", subset=["classe"])
+        s = s.map(lambda v: "color:" + CLASSE_COR.get(v, "#D7DEEA") + ";font-weight:700", subset=["classe"])
     return s
 
 
