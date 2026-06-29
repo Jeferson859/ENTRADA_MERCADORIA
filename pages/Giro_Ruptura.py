@@ -50,6 +50,15 @@ CLASSE_COR = {"A": "#00E0A1", "B": "#FFC53D", "C": "#7B8499"}
 CLASSE_BG = {"A": "rgba(0,224,161,.14)", "B": "rgba(255,197,61,.14)", "C": "rgba(123,132,153,.14)"}
 
 
+def _sty(d):
+    s = d.style
+    if "status" in d.columns:
+        s = s.applymap(lambda v: "color:" + STATUS_STYLE.get(v, ("#D7DEEA", "", ""))[0] + ";font-weight:600", subset=["status"])
+    if "classe" in d.columns:
+        s = s.applymap(lambda v: "color:" + CLASSE_COR.get(v, "#D7DEEA") + ";font-weight:700", subset=["classe"])
+    return s
+
+
 @st.cache_data(ttl=120, show_spinner=False)
 def _empresas():
     return load_empresas()
@@ -177,7 +186,7 @@ with tab1:
             legend=dict(orientation="h", y=-0.25), margin=dict(l=10, r=10, t=6, b=6))
         st.plotly_chart(fig, use_container_width=True)
     st.markdown('<div style="' + TITLE + ';margin:8px 0 8px">Visão completa · ' + str(emp) + ' — ' + str(len(dfv)) + ' de ' + str(len(df)) + ' produtos</div>', unsafe_allow_html=True)
-    st.dataframe(dfv[["produto", "classe", "estoque", "saida_periodo", "media_dia", "giro", "cobertura_dias", "status"]],
+    st.dataframe(_sty(dfv[["produto", "classe", "estoque", "saida_periodo", "media_dia", "giro", "cobertura_dias", "status"]]),
         use_container_width=True, hide_index=True, height=360,
         column_config={"produto": "Produto", "classe": "ABC", "estoque": "Estoque", "saida_periodo": "Saída",
             "media_dia": "Méd/dia", "giro": "Giro", "cobertura_dias": "Cobertura (d)", "status": "Status"})
@@ -198,7 +207,7 @@ with tab2:
     fig2.update_layout(template="plotly_dark", height=300, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=20, b=10), yaxis_title="Saída no período")
     st.plotly_chart(fig2, use_container_width=True)
     st.markdown('<div style="' + TITLE + ';margin:6px 0 8px">🚨 Classe A em risco</div>', unsafe_allow_html=True)
-    st.dataframe(classe_a_em_risco(dfv)[["produto", "estoque", "cobertura_dias", "status"]], use_container_width=True, hide_index=True)
+    st.dataframe(_sty(classe_a_em_risco(dfv)[["produto", "estoque", "cobertura_dias", "status"]]), use_container_width=True, hide_index=True)
 
 with tab3:
     st.markdown('<div style="' + TITLE + ';margin-bottom:10px">⏰ Tempo Parado</div>', unsafe_allow_html=True)
