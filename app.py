@@ -253,7 +253,14 @@ with aba_mov:
     if "valor_total" in show_fmt.columns:
         show_fmt["valor_total"] = show_fmt["valor_total"].apply(lambda v: f"R$ {float(v):,.2f}" if pd.notna(v) else "")
 
-    st.dataframe(show_fmt, use_container_width=True, height=420, hide_index=True)
+    # cor oficial de status na coluna (mesma paleta do gráfico)
+    _tbl = show_fmt
+    if "status" in show_fmt.columns:
+        _tbl = show_fmt.style.map(
+            lambda v: "color:" + _STATUS_BAR.get(str(v).upper(), "#7B8BFF") + ";font-weight:600",
+            subset=["status"],
+        )
+    st.dataframe(_tbl, use_container_width=True, height=420, hide_index=True)
     st.caption(f"Exibindo {len(show):,} de {len(df):,} registros")
 
 
@@ -459,7 +466,7 @@ with aba_ajuste:
                         y="nome_produto",
                         orientation="h",
                         color="cor",
-                        color_discrete_map={"Sobra": "#27AE60", "Falta": "#E74C3C"},
+                        color_discrete_map={"Sobra": "#00E0A1", "Falta": "#FF5C6C"},
                         text="diferenca",
                         title="Top divergências (física − sistema)",
                         labels={"diferenca": "Diferença", "nome_produto": "", "cor": ""},
@@ -480,9 +487,9 @@ with aba_ajuste:
                 def highlight_diff(row):
                     diff = row.get("diferenca", 0)
                     if diff > 0:
-                        return ["background-color: #D5F5E3; color: #1A1A1A"] * len(row)
+                        return ["background-color: rgba(0,224,161,.16); color: #E4EAF3"] * len(row)
                     if diff < 0:
-                        return ["background-color: #FADBD8; color: #1A1A1A"] * len(row)
+                        return ["background-color: rgba(255,92,108,.16); color: #E4EAF3"] * len(row)
                     return [""] * len(row)
 
                 styled_itens = df_show_item.style.apply(highlight_diff, axis=1)
