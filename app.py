@@ -12,6 +12,7 @@ st.set_page_config(
 )
 import nav
 nav.render("Pedidos")
+_STATUS_BAR = {"EXPEDICAO": "#2E7CF6", "SEPARADO": "#00D4FF", "SEPARANDO": "#3BA9FF", "CONFERIDO": "#00E0A1", "AGUARDANDO": "#FFC53D", "CANCELADO": "#FF5C6C", "CANCELAMENTO_SOLICITADO": "#FF5C6C", "ESTORNADO": "#FF8A4C"}
 
 st.markdown(
     """
@@ -158,6 +159,7 @@ with aba_mov:
                 labels={"status": "Status", "total": "Qtd."},
                 color="status",
             )
+            fig.update_traces(marker_color=[_STATUS_BAR.get(str(_s).upper(), "#7B8BFF") for _s in st_df.iloc[:, 0]])
             fig.update_traces(textposition="outside")
             fig.update_layout(showlegend=False, height=320, margin=dict(t=40, b=10))
             st.plotly_chart(fig, use_container_width=True)
