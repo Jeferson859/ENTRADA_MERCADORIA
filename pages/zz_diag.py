@@ -7,14 +7,14 @@ import streamlit as st
 from db import _query
 
 st.set_page_config(page_title="Diag", layout="wide")
-st.title("Mato Grosso — entradas FINALIZADAS de HOJE")
+st.title("Mato Grosso — entradas FINALIZADAS de 30/06 (Brasília)")
 
-st.header("Todas as entradas EXECUTADA de hoje")
+st.header("Todas as entradas EXECUTADA de hoje (30/06, horário de Brasília)")
 try:
     df = _query(
         """
         SELECT e.id,
-               e.data,
+               to_char(e.data AT TIME ZONE 'America/Sao_Paulo', 'DD/MM HH24:MI') AS data_brt,
                e.tipo,
                e.qtd_nf,
                COUNT(i.id)                    AS itens,
@@ -25,7 +25,7 @@ try:
         LEFT JOIN entrada_estoque_item i ON i.id_entrada = e.id
         WHERE em.nome_empresa = 'MATO GROSSO'
           AND e.status = 'EXECUTADA'
-          AND e.data::date = CURRENT_DATE
+          AND (e.data AT TIME ZONE 'America/Sao_Paulo')::date = DATE '2026-06-30'
         GROUP BY e.id, e.data, e.tipo, e.qtd_nf
         ORDER BY e.data DESC
         """
