@@ -9,38 +9,37 @@ from db import _query
 st.set_page_config(page_title="Diag", layout="wide")
 st.title("Diagnóstico de schema (temporário)")
 
-st.header("1. Tabelas (public)")
+st.header("A. Colunas de entrada_estoque")
 try:
-    st.dataframe(_query(
-        "SELECT table_name FROM information_schema.tables "
-        "WHERE table_schema='public' ORDER BY table_name"
-    ), use_container_width=True, height=400)
+    st.table(_query(
+        "SELECT column_name, data_type FROM information_schema.columns "
+        "WHERE table_name='entrada_estoque' ORDER BY ordinal_position"
+    ))
 except Exception as e:
     st.error(str(e))
 
-st.header("2. Colunas de RFID / tag / entrada / produção")
+st.header("B. Colunas de entrada_estoque_item")
 try:
-    st.dataframe(_query(
-        """
-        SELECT table_name, column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema='public'
-          AND (column_name ILIKE '%rfid%'
-               OR column_name ILIKE '%tag%'
-               OR column_name ILIKE '%entrada%'
-               OR table_name  ILIKE '%entrada%'
-               OR column_name ILIKE '%produc%'
-               OR table_name  ILIKE '%produc%'
-               OR column_name ILIKE '%nota%'
-               OR table_name  ILIKE '%nota%')
-        ORDER BY table_name, ordinal_position
-        """
-    ), use_container_width=True, height=500)
+    st.table(_query(
+        "SELECT column_name, data_type FROM information_schema.columns "
+        "WHERE table_name='entrada_estoque_item' ORDER BY ordinal_position"
+    ))
 except Exception as e:
     st.error(str(e))
 
-st.header("3. Empresa")
+st.header("C. Colunas com 'rfid' em qualquer tabela")
 try:
-    st.dataframe(_query("SELECT * FROM empresa ORDER BY id_empresa"), use_container_width=True)
+    st.table(_query(
+        "SELECT table_name, column_name, data_type FROM information_schema.columns "
+        "WHERE column_name ILIKE '%rfid%' ORDER BY table_name, ordinal_position"
+    ))
+except Exception as e:
+    st.error(str(e))
+
+st.header("D. entrada_estoque.tipo — distribuição")
+try:
+    st.table(_query(
+        "SELECT tipo, COUNT(*) AS qtd FROM entrada_estoque GROUP BY tipo ORDER BY qtd DESC"
+    ))
 except Exception as e:
     st.error(str(e))
