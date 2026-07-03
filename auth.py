@@ -41,21 +41,47 @@ def _hash(senha: str, salt: str) -> str:
     ).hex()
 
 
+_SQL_CRIAR_TABELA = """
+CREATE TABLE IF NOT EXISTS app_usuario (
+    id          SERIAL PRIMARY KEY,
+    usuario     TEXT UNIQUE NOT NULL,
+    senha_hash  TEXT NOT NULL,
+    salt        TEXT NOT NULL,
+    perfil      TEXT NOT NULL DEFAULT 'empresa',
+    id_empresa  INT,
+    ativo       BOOLEAN NOT NULL DEFAULT TRUE,
+    criado_em   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+"""
+
+
+def _tabela_existe() -> bool:
+    df = _df("SELECT to_regclass('app_usuario') IS NOT NULL AS ok")
+    return bool(df.iloc[0]["ok"])
+
+
 @st.cache_resource(show_spinner=False)
 def init_usuarios():
-    """Cria a tabela de usuários e o admin inicial (roda 1x por processo)."""
-    _exec("""
-        CREATE TABLE IF NOT EXISTS app_usuario (
-            id          SERIAL PRIMARY KEY,
-            usuario     TEXT UNIQUE NOT NULL,
-            senha_hash  TEXT NOT NULL,
-            salt        TEXT NOT NULL,
-            perfil      TEXT NOT NULL DEFAULT 'empresa',
-            id_empresa  INT,
-            ativo       BOOLEAN NOT NULL DEFAULT TRUE,
-            criado_em   TIMESTAMP NOT NULL DEFAULT NOW()
-        )
-    """)
+    """Garante a tabela de usuários e o admin inicial (roda 1x por processo)."""
+    if not _tabela_existe():
+        try:
+            _exec(_SQL_CRIAR_TABELA)
+        except Exception:
+            # usuário do banco sem permissão de CREATE (ex.: permission denied
+            # for schema public) → orienta a criar a tabela manualmente
+            st.error(
+                "O usuário do banco não tem permissão para criar tabelas. "
+                "Peça ao administrador do banco para executar o SQL abaixo "
+                "uma única vez (e conceda SELECT/INSERT/UPDATE/DELETE na "
+                "tabela ao usuário do app):"
+            )
+            st.code(
+                _SQL_CRIAR_TABELA
+                + "\nGRANT SELECT, INSERT, UPDATE, DELETE ON app_usuario TO SEU_DB_USER;"
+                + "\nGRANT USAGE, SELECT ON SEQUENCE app_usuario_id_seq TO SEU_DB_USER;",
+                language="sql",
+            )
+            st.stop()
     n = int(_df("SELECT COUNT(*) AS n FROM app_usuario").iloc[0]["n"])
     if n == 0:
         senha = _get_secret("ADMIN_SENHA", _get_secret("APP_SENHA", "admin123"))
