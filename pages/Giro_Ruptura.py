@@ -16,6 +16,8 @@ from db_giro_ruptura import (
 )
 
 st.set_page_config(page_title="Giro & Ruptura", page_icon="📦", layout="wide")
+import auth
+auth.require_login()
 import nav
 nav.render("Estoque")
 
@@ -89,8 +91,15 @@ with bcol:
         st.rerun()
 
 empresas = _empresas()
+_id_emp_user = auth.id_empresa_usuario()  # None = admin (todas as empresas)
+if _id_emp_user is not None:
+    empresas = empresas[empresas["id_empresa"] == _id_emp_user]
+    if empresas.empty:
+        st.error("Seu usuário não está vinculado a uma empresa válida. Fale com o administrador.")
+        st.stop()
 f1, f2, f3, f4 = st.columns([2, 1.5, 1.5, 2])
-emp = f1.selectbox("🏢 Empresa", empresas["nome_empresa"])
+emp = f1.selectbox("🏢 Empresa", empresas["nome_empresa"],
+                   disabled=(_id_emp_user is not None))
 id_emp = int(empresas.loc[empresas["nome_empresa"] == emp, "id_empresa"].iloc[0])
 dias = f2.radio("Janela de saída", [30, 60, 90], horizontal=True)
 lead = f3.slider("Prazo de reposição (dias)", 5, 45, 15, step=5)
