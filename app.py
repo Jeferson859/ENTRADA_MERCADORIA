@@ -10,8 +10,11 @@ st.set_page_config(
     page_icon="📋",
     layout="wide",
 )
+import auth
+auth.require_login()
 import nav
 nav.render("Pedidos")
+_ID_EMPRESA = auth.id_empresa_usuario()  # None = admin (todas as empresas)
 _STATUS_BAR = {"EXPEDICAO": "#2E7CF6", "SEPARADO": "#00D4FF", "SEPARANDO": "#3BA9FF", "CONFERIDO": "#00E0A1", "AGUARDANDO": "#FFC53D", "CANCELADO": "#FF5C6C", "CANCELAMENTO_SOLICITADO": "#FF5C6C", "ESTORNADO": "#FF8A4C"}
 
 st.markdown(
@@ -104,17 +107,18 @@ with aba_mov:
             id_vend = int(row.iloc[0]["id_vendedor"])
 
     @st.cache_data(ttl=60, show_spinner="Carregando pedidos...")
-    def fetch_mov(di, df, st_val, tp_val, vd_val):
+    def fetch_mov(di, df, st_val, tp_val, vd_val, id_emp):
         return load_pedidos(
             data_ini=di,
             data_fim=df,
             status=None if st_val == "Todos" else st_val,
             tipo_pedido=None if tp_val == "Todos" else tp_val,
             id_vendedor=vd_val,
+            id_empresa=id_emp,
         )
 
     try:
-        df = fetch_mov(data_ini, data_fim, sel_status, sel_tipo, id_vend)
+        df = fetch_mov(data_ini, data_fim, sel_status, sel_tipo, id_vend, _ID_EMPRESA)
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
         st.stop()

@@ -72,7 +72,7 @@ def _clausula_periodo(clauses: list, params: dict, data_ini, data_fim, col: str 
 # CONSULTAS — app.py (Movimentação / Buscar Pedido / Ajuste de Estoque)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def load_pedidos(data_ini=None, data_fim=None, status=None, tipo_pedido=None, id_vendedor=None) -> pd.DataFrame:
+def load_pedidos(data_ini=None, data_fim=None, status=None, tipo_pedido=None, id_vendedor=None, id_empresa=None) -> pd.DataFrame:
     clauses = ["1=1"]
     params = {}
     _clausula_periodo(clauses, params, data_ini, data_fim)
@@ -86,6 +86,10 @@ def load_pedidos(data_ini=None, data_fim=None, status=None, tipo_pedido=None, id
     if id_vendedor:
         clauses.append("p.id_vendedor = :id_vendedor")
         params["id_vendedor"] = id_vendedor
+    if id_empresa is not None:
+        # pedido não tem id_empresa: a empresa vem do vendedor do pedido
+        clauses.append("p.id_vendedor IN (SELECT id_vendedor FROM vendedor WHERE id_empresa = :id_empresa)")
+        params["id_empresa"] = int(id_empresa)
 
     where = " AND ".join(clauses)
 

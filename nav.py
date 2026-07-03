@@ -1,9 +1,18 @@
 # encoding: utf-8
 import streamlit as st
 
+import auth
+
 
 def render(active: str = ""):
-    """Menu lateral da marca AdriLar (esconde a navegação padrão do Streamlit)."""
+    """Menu lateral da marca AdriLar (esconde a navegação padrão do Streamlit).
+
+    Os links exibidos dependem do perfil logado:
+      - todos os logados: Estoque, Pedidos
+      - somente admin:    Vendas, Central de Usuários
+    """
+    user = auth.usuario_atual()
+
     st.markdown(
         """
         <style>
@@ -20,17 +29,6 @@ def render(active: str = ""):
         }
         section[data-testid="stSidebar"] a[data-testid="stPageLink-NavLink"]:hover {
             background: rgba(59,169,255,.13);
-        }
-        /* espaço para o rodapé fixo do usuário */
-        section[data-testid="stSidebar"] > div:first-child { padding-bottom: 104px; }
-        .adrilar-userbox {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 244px;
-            background: linear-gradient(180deg, rgba(8,13,23,0), #080D17 30%);
-            padding: 18px 16px 16px;
-            z-index: 100;
         }
         </style>
         """,
@@ -50,20 +48,32 @@ def render(active: str = ""):
             unsafe_allow_html=True,
         )
         st.page_link("pages/Giro_Ruptura.py", label="Estoque", icon="📦")
-        st.page_link("pages/Dashboard_Vendas.py", label="Vendas", icon="📊")
+        if auth.is_admin():
+            st.page_link("pages/Dashboard_Vendas.py", label="Vendas", icon="📊")
         st.page_link("app.py", label="Pedidos", icon="📋")
-        st.markdown(
-            """
-            <div class="adrilar-userbox">
-              <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:12px;display:flex;align-items:center;gap:10px">
-                <div style="width:34px;height:34px;border-radius:9px;background:#16243b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9CC6FF">JA</div>
-                <div>
-                  <div style="font-size:13px;color:#E4EAF3;font-weight:600">Jeferson A.</div>
-                  <div style="font-size:11px;color:#6B7385">administrador</div>
+        if auth.is_admin():
+            st.page_link("pages/Central_Usuarios.py", label="Central de Usuários", icon="🔐")
+
+        # ── rodapé do usuário logado ──────────────────────────────────────────
+        if user:
+            iniciais = user["usuario"][:2].upper()
+            escopo = "todas as empresas" if user["perfil"] == "admin" \
+                else (user.get("nome_empresa") or "empresa")
+            st.markdown(
+                f"""
+                <div style="border-top:1px solid rgba(255,255,255,.07);margin-top:14px;padding-top:12px;display:flex;align-items:center;gap:10px">
+                  <div style="width:34px;height:34px;border-radius:9px;background:#16243b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9CC6FF">{iniciais}</div>
+                  <div>
+                    <div style="font-size:13px;color:#E4EAF3;font-weight:600">{user['usuario']}</div>
+                    <div style="font-size:11px;color:#6B7385">{user['perfil']} · {escopo}</div>
+                  </div>
                 </div>
-              </div>
-              <div style="font-size:10px;color:#5A6275;margin-top:8px;line-height:1.5">v2.0 · produto interno · conectado: AdriLar</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True,
+            )
+            if st.button("Sair", use_container_width=True):
+                auth.logout()
+            st.markdown(
+                '<div style="font-size:10px;color:#5A6275;margin-top:6px;line-height:1.5">v2.1 · produto interno · conectado: AdriLar</div>',
+                unsafe_allow_html=True,
+            )
