@@ -1,39 +1,118 @@
 # encoding: utf-8
-"""Autenticação com perfis por empresa.
+"""Autenticação com perfis por empresa — usuários gravados no GITHUB (sem banco).
+
+Os usuários ficam em um arquivo JSON num repositório GitHub (use um repo
+PRIVADO!), acessado pela API de Contents. Nada de tabela app_usuario.
+
+Configure em .streamlit/secrets.toml (ou Secrets do Streamlit Cloud):
+
+    [github]
+    token  = "github_pat_..."          # fine-grained, Contents: Read/Write
+    repo   = "Jeferson859/adrilar-dados"   # REPO PRIVADO para os usuários
+    branch = "main"
+    path   = "dados/usuarios.json"
 
 Perfis:
-  - admin ....... vê todas as empresas, gerencia usuários (Central de Usuários)
-                  e é o ÚNICO que pode deletar registros.
+  - admin ....... vê todas as empresas, gerencia usuários e pode deletar.
   - empresa ..... vê apenas os dados da empresa vinculada (id_empresa).
 
-Os usuários ficam na tabela `app_usuario` do mesmo Postgres do app.
 No primeiro acesso, se não houver nenhum usuário, é criado o usuário
 `admin` com a senha do secret ADMIN_SENHA (ou APP_SENHA como reserva,
 ou "admin123" se nenhum secret existir — troque imediatamente).
 """
+import base64
 import hashlib
+import json
+import os
 import secrets as _secrets
+from datetime import datetime, timezone
 
 import pandas as pd
+import requests
 import streamlit as st
-from sqlalchemy import text
-
-from db import get_engine, _get_secret
 
 _PERFIS = ("admin", "empresa")
 
 
-# ── infraestrutura ────────────────────────────────────────────────────────────
+# ── secrets / config ──────────────────────────────────────────────────────────
 
-def _exec(sql: str, params: dict = None):
-    with get_engine().begin() as conn:
-        conn.execute(text(sql), params or {})
+def _get_secret(nome: str, padrao=None):
+    try:
+        if nome in st.secrets:
+            return st.secrets[nome]
+    except Exception:
+        pass
+    return os.environ.get(nome, padrao)
 
 
-def _df(sql: str, params: dict = None) -> pd.DataFrame:
-    with get_engine().connect() as conn:
-        return pd.read_sql(text(sql), conn, params=params or {})
+def _gh_cfg():
+    gh = {}
+    try:
+        gh = dict(st.secrets.get("github", {}))
+    except Exception:
+        pass
+    token = gh.get("token") or _get_secret("GITHUB_TOKEN")
+    repo = gh.get("repo") or _get_secret("GITHUB_REPO")
+    branch = gh.get("branch") or _get_secret("GITHUB_BRANCH", "main")
+    path = gh.get("path") or _get_secret("GITHUB_PATH", "dados/usuarios.json")
+    if not token or not repo:
+        st.error(
+            "Configuração do GitHub ausente. Adicione nos Secrets do app:\n\n"
+            "```toml\n[github]\ntoken  = \"github_pat_...\"\n"
+            "repo   = \"usuario/repo-privado\"\nbranch = \"main\"\n"
+            "path   = \"dados/usuarios.json\"\n```"
+        )
+        st.stop()
+    return token, repo, branch, path
 
+
+def _api():
+    token, repo, branch, path = _gh_cfg()
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+    }
+    return url, headers, branch
+
+
+# ── armazenamento no GitHub ───────────────────────────────────────────────────
+
+def _carregar():
+    """Retorna (lista_de_usuarios, sha). sha=None se o arquivo ainda não existe."""
+    url, headers, branch = _api()
+    r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+    if r.status_code == 404:
+        return [], None
+    r.raise_for_status()
+    dados = r.json()
+    try:
+        usuarios = json.loads(base64.b64decode(dados["content"]).decode("utf-8"))
+    except (json.JSONDecodeError, KeyError):
+        usuarios = []
+    return usuarios, dados["sha"]
+
+
+def _salvar(usuarios: list, sha, mensagem: str):
+    url, headers, branch = _api()
+    payload = {
+        "message": mensagem,
+        "content": base64.b64encode(
+            json.dumps(usuarios, ensure_ascii=False, indent=2).encode("utf-8")
+        ).decode("ascii"),
+        "branch": branch,
+    }
+    if sha:
+        payload["sha"] = sha
+    r = requests.put(url, headers=headers, json=payload, timeout=20)
+    if r.status_code == 409:  # conflito de sha → recarrega e tenta 1x
+        atuais, sha2 = _carregar()
+        payload["sha"] = sha2
+        r = requests.put(url, headers=headers, json=payload, timeout=20)
+    r.raise_for_status()
+
+
+# ── senha ─────────────────────────────────────────────────────────────────────
 
 def _hash(senha: str, salt: str) -> str:
     return hashlib.pbkdf2_hmac(
@@ -41,52 +120,50 @@ def _hash(senha: str, salt: str) -> str:
     ).hex()
 
 
-_SQL_CRIAR_TABELA = """
-CREATE TABLE IF NOT EXISTS app_usuario (
-    id          SERIAL PRIMARY KEY,
-    usuario     TEXT UNIQUE NOT NULL,
-    senha_hash  TEXT NOT NULL,
-    salt        TEXT NOT NULL,
-    perfil      TEXT NOT NULL DEFAULT 'empresa',
-    id_empresa  INT,
-    ativo       BOOLEAN NOT NULL DEFAULT TRUE,
-    criado_em   TIMESTAMP NOT NULL DEFAULT NOW()
-);
-"""
-
-
-def _tabela_existe() -> bool:
-    df = _df("SELECT to_regclass('app_usuario') IS NOT NULL AS ok")
-    return bool(df.iloc[0]["ok"])
-
+# ── bootstrap ─────────────────────────────────────────────────────────────────
 
 @st.cache_resource(show_spinner=False)
 def init_usuarios():
-    """Garante a tabela de usuários e o admin inicial (roda 1x por processo)."""
-    if not _tabela_existe():
-        try:
-            _exec(_SQL_CRIAR_TABELA)
-        except Exception:
-            # usuário do banco sem permissão de CREATE (ex.: permission denied
-            # for schema public) → orienta a criar a tabela manualmente
-            st.error(
-                "O usuário do banco não tem permissão para criar tabelas. "
-                "Peça ao administrador do banco para executar o SQL abaixo "
-                "uma única vez (e conceda SELECT/INSERT/UPDATE/DELETE na "
-                "tabela ao usuário do app):"
-            )
-            st.code(
-                _SQL_CRIAR_TABELA
-                + "\nGRANT SELECT, INSERT, UPDATE, DELETE ON app_usuario TO SEU_DB_USER;"
-                + "\nGRANT USAGE, SELECT ON SEQUENCE app_usuario_id_seq TO SEU_DB_USER;",
-                language="sql",
-            )
-            st.stop()
-    n = int(_df("SELECT COUNT(*) AS n FROM app_usuario").iloc[0]["n"])
-    if n == 0:
+    """Garante o admin inicial no JSON do GitHub (roda 1x por processo)."""
+    try:
+        usuarios, sha = _carregar()
+    except requests.HTTPError as e:
+        st.error(
+            f"Não foi possível acessar o GitHub ({e.response.status_code}). "
+            "Verifique token/permissões nos Secrets."
+        )
+        st.stop()
+    if not usuarios:
         senha = _get_secret("ADMIN_SENHA", _get_secret("APP_SENHA", "admin123"))
-        criar_usuario("admin", senha, perfil="admin")
+        salt = _secrets.token_hex(16)
+        usuarios = [{
+            "id": 1,
+            "usuario": "admin",
+            "senha_hash": _hash(senha, salt),
+            "salt": salt,
+            "perfil": "admin",
+            "id_empresa": None,
+            "ativo": True,
+            "criado_em": datetime.now(timezone.utc).isoformat(),
+        }]
+        _salvar(usuarios, sha, "Bootstrap: usuário admin inicial")
     return True
+
+
+# ── nome da empresa (opcional, via banco; falha silenciosa) ───────────────────
+
+def _nome_empresa(id_empresa):
+    if id_empresa is None:
+        return None
+    try:
+        from db import load_empresas
+        emp = load_empresas()
+        row = emp[emp["id_empresa"] == int(id_empresa)]
+        if not row.empty:
+            return str(row.iloc[0]["nome_empresa"])
+    except Exception:
+        pass
+    return f"Empresa {id_empresa}"
 
 
 # ── CRUD de usuários (usado pela Central de Usuários) ────────────────────────
@@ -96,64 +173,82 @@ def criar_usuario(usuario: str, senha: str, perfil: str = "empresa", id_empresa=
         raise ValueError(f"Perfil inválido: {perfil}")
     if perfil == "empresa" and id_empresa is None:
         raise ValueError("Usuário de empresa precisa de uma empresa vinculada.")
+    usuario = usuario.strip().lower()
+    usuarios, sha = _carregar()
+    if any(u["usuario"] == usuario for u in usuarios):
+        raise ValueError(f"O usuário '{usuario}' já existe.")
     salt = _secrets.token_hex(16)
-    _exec(
-        """INSERT INTO app_usuario (usuario, senha_hash, salt, perfil, id_empresa)
-           VALUES (:u, :h, :s, :p, :e)""",
-        {"u": usuario.strip().lower(), "h": _hash(senha, salt), "s": salt,
-         "p": perfil, "e": int(id_empresa) if id_empresa is not None else None},
-    )
+    usuarios.append({
+        "id": max((u["id"] for u in usuarios), default=0) + 1,
+        "usuario": usuario,
+        "senha_hash": _hash(senha, salt),
+        "salt": salt,
+        "perfil": perfil,
+        "id_empresa": int(id_empresa) if id_empresa is not None else None,
+        "ativo": True,
+        "criado_em": datetime.now(timezone.utc).isoformat(),
+    })
+    _salvar(usuarios, sha, f"Novo usuário: {usuario}")
 
 
 def listar_usuarios() -> pd.DataFrame:
-    return _df("""
-        SELECT au.id, au.usuario, au.perfil,
-               COALESCE(e.nome_empresa, '— todas —') AS empresa,
-               au.ativo, au.criado_em
-        FROM app_usuario au
-        LEFT JOIN empresa e ON e.id_empresa = au.id_empresa
-        ORDER BY au.usuario
-    """)
+    usuarios, _ = _carregar()
+    linhas = [{
+        "id": u["id"],
+        "usuario": u["usuario"],
+        "perfil": u["perfil"],
+        "empresa": "— todas —" if u.get("id_empresa") is None
+                   else _nome_empresa(u["id_empresa"]),
+        "ativo": bool(u.get("ativo", True)),
+        "criado_em": (u.get("criado_em") or "")[:19].replace("T", " "),
+    } for u in usuarios]
+    df = pd.DataFrame(linhas, columns=["id", "usuario", "perfil", "empresa", "ativo", "criado_em"])
+    return df.sort_values("usuario").reset_index(drop=True) if not df.empty else df
+
+
+def _alterar(usuario: str, mensagem: str, fn):
+    usuarios, sha = _carregar()
+    for u in usuarios:
+        if u["usuario"] == usuario:
+            fn(u)
+            break
+    _salvar(usuarios, sha, mensagem)
 
 
 def alterar_senha(usuario: str, nova_senha: str):
     salt = _secrets.token_hex(16)
-    _exec(
-        "UPDATE app_usuario SET senha_hash = :h, salt = :s WHERE usuario = :u",
-        {"h": _hash(nova_senha, salt), "s": salt, "u": usuario},
-    )
+    def fn(u):
+        u["senha_hash"] = _hash(nova_senha, salt)
+        u["salt"] = salt
+    _alterar(usuario, f"Senha alterada: {usuario}", fn)
 
 
 def definir_ativo(usuario: str, ativo: bool):
-    _exec("UPDATE app_usuario SET ativo = :a WHERE usuario = :u",
-          {"a": bool(ativo), "u": usuario})
+    _alterar(usuario, f"{'Ativado' if ativo else 'Desativado'}: {usuario}",
+             lambda u: u.__setitem__("ativo", bool(ativo)))
 
 
 def excluir_usuario(usuario: str):
-    _exec("DELETE FROM app_usuario WHERE usuario = :u", {"u": usuario})
+    usuarios, sha = _carregar()
+    usuarios = [u for u in usuarios if u["usuario"] != usuario]
+    _salvar(usuarios, sha, f"Usuário excluído: {usuario}")
 
 
 def autenticar(usuario: str, senha: str):
     """Devolve o dict do usuário se usuário/senha conferem, senão None."""
-    df = _df(
-        """SELECT au.usuario, au.senha_hash, au.salt, au.perfil, au.id_empresa,
-                  e.nome_empresa
-           FROM app_usuario au
-           LEFT JOIN empresa e ON e.id_empresa = au.id_empresa
-           WHERE au.usuario = :u AND au.ativo""",
-        {"u": usuario.strip().lower()},
-    )
-    if df.empty:
-        return None
-    row = df.iloc[0]
-    if _hash(senha, row["salt"]) != row["senha_hash"]:
-        return None
-    return {
-        "usuario": row["usuario"],
-        "perfil": row["perfil"],
-        "id_empresa": None if pd.isna(row["id_empresa"]) else int(row["id_empresa"]),
-        "nome_empresa": row["nome_empresa"] if pd.notna(row["nome_empresa"]) else None,
-    }
+    usuarios, _ = _carregar()
+    usuario = usuario.strip().lower()
+    for u in usuarios:
+        if u["usuario"] == usuario and u.get("ativo", True):
+            if _hash(senha, u["salt"]) == u["senha_hash"]:
+                return {
+                    "usuario": u["usuario"],
+                    "perfil": u["perfil"],
+                    "id_empresa": u.get("id_empresa"),
+                    "nome_empresa": _nome_empresa(u.get("id_empresa")),
+                }
+            return None
+    return None
 
 
 # ── sessão / permissões ───────────────────────────────────────────────────────
@@ -193,22 +288,43 @@ def require_login():
 
     st.markdown(
         """
-        <div style="display:flex;align-items:center;gap:14px;margin:2rem 0 1rem">
-          <div style="width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,#2E7CF6,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:23px">🔐</div>
+        <style>
+        div[data-testid="stForm"] {
+            background: linear-gradient(165deg, rgba(46,124,246,.08), rgba(0,212,255,.03));
+            border: 1px solid rgba(59,169,255,.22);
+            border-radius: 18px;
+            padding: 30px 34px;
+            max-width: 460px;
+            margin: 0 auto;
+            box-shadow: 0 24px 70px rgba(0,0,0,.45);
+        }
+        div[data-testid="stForm"] button {
+            background: linear-gradient(135deg, #2E7CF6, #00D4FF);
+            color: #06121F; font-weight: 700; border: none;
+            border-radius: 10px; transition: transform .15s ease, box-shadow .15s ease;
+        }
+        div[data-testid="stForm"] button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 26px rgba(46,124,246,.45);
+        }
+        </style>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin:3rem 0 1.4rem;text-align:center">
+          <div style="width:62px;height:62px;border-radius:17px;background:linear-gradient(150deg,#2E7CF6,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 10px 32px rgba(46,124,246,.45)">🔐</div>
           <div>
-            <div style="font-size:21px;font-weight:800;color:#F2F6FC">AdriLar · Acesso restrito</div>
-            <div style="font-size:12px;color:#6B7385">Entre com o usuário e a senha fornecidos pelo administrador</div>
+            <div style="font-size:24px;font-weight:800;color:#F2F6FC;letter-spacing:-.02em">AdriLar · Acesso restrito</div>
+            <div style="font-size:12.5px;color:#6B7385;margin-top:4px">Entre com o usuário e a senha fornecidos pelo administrador</div>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
     with st.form("login"):
-        usuario = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
+        usuario = st.text_input("Usuário", placeholder="seu.usuario")
+        senha = st.text_input("Senha", type="password", placeholder="••••••••")
         ok = st.form_submit_button("Entrar", use_container_width=True)
     if ok:
-        user = autenticar(usuario, senha)
+        with st.spinner("Verificando..."):
+            user = autenticar(usuario, senha)
         if user:
             st.session_state["usuario"] = user
             st.rerun()
