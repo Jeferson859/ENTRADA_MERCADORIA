@@ -3,7 +3,7 @@
 
 Os usuários são gravados em um arquivo JSON no GitHub (sem banco).
 Aqui o admin cria usuários e senhas, vincula cada usuário a uma empresa,
-reseta senhas, desativa e exclui contas.
+libera módulos, reseta senhas, desativa e exclui contas.
 """
 import os
 import sys
@@ -60,7 +60,7 @@ st.markdown(
         <div style="width:46px;height:46px;border-radius:13px;background:linear-gradient(150deg,#2E7CF6,#00D4FF);display:flex;align-items:center;justify-content:center;font-size:23px">🔐</div>
         <div>
           <div style="font-size:21px;font-weight:800;color:#F2F6FC">Central de Usuários</div>
-          <div style="font-size:12px;color:#6B7385">Crie logins por empresa · o perfil <b>admin</b> vê todas as empresas e é o único que pode deletar</div>
+          <div style="font-size:12px;color:#6B7385">Crie logins por empresa, libere módulos · o perfil <b>admin</b> vê tudo e é o único que pode deletar</div>
         </div>
       </div>
       <span class="badge-github">● dados gravados no GitHub</span>
@@ -95,6 +95,13 @@ with col_novo:
             horizontal=True,
             help="empresa: vê só a empresa vinculada · admin: vê todas e pode deletar",
         )
+        st.markdown("**Módulos liberados** (apenas para perfil empresa — admin vê tudo)")
+        mods_sel = []
+        mcols = st.columns(len(auth.MODULOS))
+        for _i, (_chave, _rotulo) in enumerate(auth.MODULOS.items()):
+            with mcols[_i]:
+                if st.checkbox(_rotulo, value=True, key=f"novo_mod_{_chave}"):
+                    mods_sel.append(_chave)
         if empresas is not None and not empresas.empty:
             emp_nome = st.selectbox(
                 "Empresa vinculada (apenas para perfil empresa)",
@@ -116,6 +123,8 @@ with col_novo:
             st.error("A senha deve ter pelo menos 6 caracteres.")
         elif senha != senha2:
             st.error("As senhas não conferem.")
+        elif perfil == "empresa" and not mods_sel:
+            st.error("Selecione ao menos um módulo para o usuário.")
         else:
             try:
                 id_emp = None
@@ -127,7 +136,10 @@ with col_novo:
                     else:
                         id_emp = int(emp_id_manual)
                 with st.spinner("Gravando no GitHub..."):
-                    auth.criar_usuario(usuario, senha, perfil=perfil, id_empresa=id_emp)
+                    auth.criar_usuario(
+                        usuario, senha, perfil=perfil, id_empresa=id_emp,
+                        modulos=None if perfil == "admin" else mods_sel,
+                    )
                 st.success(f"Usuário **{usuario.strip().lower()}** criado.")
                 st.balloons()
             except Exception as e:
@@ -149,7 +161,8 @@ with col_lista:
             usuarios.assign(ativo=usuarios["ativo"].map({True: "✅", False: "🚫"}))
             .rename(columns={
                 "usuario": "Usuário", "perfil": "Perfil",
-                "empresa": "Empresa", "ativo": "Ativo", "criado_em": "Criado em",
+                "empresa": "Empresa", "modulos": "Módulos",
+                "ativo": "Ativo", "criado_em": "Criado em",
             }).drop(columns=["id"]),
             use_container_width=True, hide_index=True,
         )
@@ -158,7 +171,7 @@ with col_lista:
         nomes = usuarios["usuario"].tolist()
         alvo = st.selectbox("Usuário", nomes, key="ger_usuario")
         eu = auth.usuario_atual()["usuario"]
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
 
         with c1:
             with st.popover("🔑 Resetar senha", use_container_width=True):
@@ -178,6 +191,29 @@ with col_lista:
                 st.rerun()
 
         with c3:
+            with st.popover("🧩 Módulos", use_container_width=True):
+                alvo_perfil = usuarios.loc[usuarios["usuario"] == alvo, "perfil"].iloc[0]
+                if alvo_perfil == "admin":
+                    st.info("Admin tem acesso a todos os módulos.")
+                else:
+                    st.caption(f"Módulos liberados para **{alvo}**:")
+                    todos_usuarios, _sha = auth._carregar()
+                    alvo_dados = next((u for u in todos_usuarios if u["usuario"] == alvo), {})
+                    atuais = alvo_dados.get("modulos")
+                    novos = []
+                    for _chave, _rotulo in auth.MODULOS.items():
+                        marcado = True if atuais is None else (_chave in atuais)
+                        if st.checkbox(_rotulo, value=marcado, key=f"ger_mod_{alvo}_{_chave}"):
+                            novos.append(_chave)
+                    if st.button("Salvar módulos", use_container_width=True, key="salvar_mods"):
+                        if not novos:
+                            st.error("Selecione ao menos um módulo.")
+                        else:
+                            auth.definir_modulos(alvo, novos)
+                            st.success("Módulos atualizados.")
+                            st.rerun()
+
+        with c4:
             with st.popover("🗑️ Excluir", use_container_width=True):
                 st.warning(f"Excluir **{alvo}** definitivamente?")
                 if st.button("Confirmar exclusão", use_container_width=True,
