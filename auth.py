@@ -33,6 +33,12 @@ import streamlit as st
 
 _PERFIS = ("admin", "empresa")
 
+# Módulos que podem ser liberados por usuário (páginas de admin ficam de fora)
+MODULOS = {
+    "pedidos": "📋 Pedidos",
+    "estoque": "📦 Estoque",
+}
+
 
 # ── secrets / config ──────────────────────────────────────────────────────────
 
@@ -168,11 +174,16 @@ def _nome_empresa(id_empresa):
 
 # ── CRUD de usuários (usado pela Central de Usuários) ────────────────────────
 
-def criar_usuario(usuario: str, senha: str, perfil: str = "empresa", id_empresa=None):
+def criar_usuario(usuario: str, senha: str, perfil: str = "empresa", id_empresa=None,
+                  modulos=None):
     if perfil not in _PERFIS:
         raise ValueError(f"Perfil inválido: {perfil}")
     if perfil == "empresa" and id_empresa is None:
         raise ValueError("Usuário de empresa precisa de uma empresa vinculada.")
+    if modulos is not None:
+        modulos = [m for m in modulos if m in MODULOS]
+        if perfil == "empresa" and not modulos:
+            raise ValueError("Selecione ao menos um módulo para o usuário.")
     usuario = usuario.strip().lower()
     usuarios, sha = _carregar()
     if any(u["usuario"] == usuario for u in usuarios):
@@ -185,6 +196,7 @@ def criar_usuario(usuario: str, senha: str, perfil: str = "empresa", id_empresa=
         "salt": salt,
         "perfil": perfil,
         "id_empresa": int(id_empresa) if id_empresa is not None else None,
+        "modulos": modulos,  # None = todos os módulos
         "ativo": True,
         "criado_em": datetime.now(timezone.utc).isoformat(),
     })
@@ -199,10 +211,12 @@ def listar_usuarios() -> pd.DataFrame:
         "perfil": u["perfil"],
         "empresa": "— todas —" if u.get("id_empresa") is None
                    else _nome_empresa(u["id_empresa"]),
+        "modulos": "— todos —" if u["perfil"] == "admin" or u.get("modulos") is None
+                   else ", ".join(MODULOS.get(m, m) for m in u["modulos"]),
         "ativo": bool(u.get("ativo", True)),
         "criado_em": (u.get("criado_em") or "")[:19].replace("T", " "),
     } for u in usuarios]
-    df = pd.DataFrame(linhas, columns=["id", "usuario", "perfil", "empresa", "ativo", "criado_em"])
+    df = pd.DataFrame(linhas, columns=["id", "usuario", "perfil", "empresa", "modulos", "ativo", "criado_em"])
     return df.sort_values("usuario").reset_index(drop=True) if not df.empty else df
 
 
@@ -228,6 +242,14 @@ def definir_ativo(usuario: str, ativo: bool):
              lambda u: u.__setitem__("ativo", bool(ativo)))
 
 
+def definir_modulos(usuario: str, modulos):
+    """modulos: lista de chaves de MODULOS, ou None para liberar todos."""
+    if modulos is not None:
+        modulos = [m for m in modulos if m in MODULOS]
+    _alterar(usuario, f"Módulos alterados: {usuario}",
+             lambda u: u.__setitem__("modulos", modulos))
+
+
 def excluir_usuario(usuario: str):
     usuarios, sha = _carregar()
     usuarios = [u for u in usuarios if u["usuario"] != usuario]
@@ -246,6 +268,7 @@ def autenticar(usuario: str, senha: str):
                     "perfil": u["perfil"],
                     "id_empresa": u.get("id_empresa"),
                     "nome_empresa": _nome_empresa(u.get("id_empresa")),
+                    "modulos": u.get("modulos"),  # None = todos
                 }
             return None
     return None
@@ -273,6 +296,29 @@ def id_empresa_usuario():
 def pode_deletar() -> bool:
     """Regra global: somente o admin pode deletar registros."""
     return is_admin()
+
+
+def tem_acesso(modulo: str) -> bool:
+    """Admin acessa tudo; demais usuários só os módulos liberados.
+    Usuário sem o campo 'modulos' (None) mantém acesso a todos (compatibilidade)."""
+    u = usuario_atual()
+    if not u:
+        return False
+    if u["perfil"] == "admin":
+        return True
+    mods = u.get("modulos")
+    if mods is None:
+        return True
+    return modulo in mods
+
+
+def exigir_acesso(modulo: str):
+    """Exige login E acesso ao módulo. Use no topo das páginas de módulo."""
+    require_login()
+    if not tem_acesso(modulo):
+        st.error(f"Seu usuário não tem acesso ao módulo {MODULOS.get(modulo, modulo)}. "
+                 "Fale com o administrador.")
+        st.stop()
 
 
 def logout():
@@ -343,3 +389,4 @@ def exigir_admin():
 # compatibilidade com o código antigo (senha única) — não usar em páginas novas
 def protect():
     require_login()
+# v2.2 módulos por usuário
