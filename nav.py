@@ -3,15 +3,28 @@ import streamlit as st
 
 import auth
 
+# página ativa → módulo controlado por usuário (páginas de admin não entram aqui)
+_MODULO_DA_PAGINA = {"Pedidos": "pedidos", "Estoque": "estoque"}
+
 
 def render(active: str = ""):
     """Menu lateral da marca AdriLar (esconde a navegação padrão do Streamlit).
 
-    Os links exibidos dependem do perfil logado:
-      - todos os logados: Estoque, Pedidos
-      - somente admin:    Vendas, Central de Usuários
+    Os links exibidos dependem do perfil e dos módulos liberados:
+    - Estoque / Pedidos: somente quem tem o módulo liberado (admin vê tudo)
+    - Vendas e Central de Usuários: somente admin
+    Também BLOQUEIA a página atual se o usuário não tiver o módulo dela.
     """
     user = auth.usuario_atual()
+
+    # trava de acesso da página ativa (defesa central, além do menu)
+    if active in _MODULO_DA_PAGINA and user and not auth.tem_acesso(_MODULO_DA_PAGINA[active]):
+        st.error(
+            f"Seu usuário não tem acesso ao módulo "
+            f"{auth.MODULOS.get(_MODULO_DA_PAGINA[active], active)}. "
+            "Fale com o administrador."
+        )
+        st.stop()
 
     st.markdown(
         """
@@ -47,10 +60,12 @@ def render(active: str = ""):
             """,
             unsafe_allow_html=True,
         )
-        st.page_link("pages/Giro_Ruptura.py", label="Estoque", icon="📦")
+        if auth.tem_acesso("estoque"):
+            st.page_link("pages/Giro_Ruptura.py", label="Estoque", icon="📦")
         if auth.is_admin():
             st.page_link("pages/Dashboard_Vendas.py", label="Vendas", icon="📊")
-        st.page_link("app.py", label="Pedidos", icon="📋")
+        if auth.tem_acesso("pedidos"):
+            st.page_link("app.py", label="Pedidos", icon="📋")
         if auth.is_admin():
             st.page_link("pages/Central_Usuarios.py", label="Central de Usuários", icon="🔐")
 
@@ -73,7 +88,7 @@ def render(active: str = ""):
             )
             if st.button("Sair", use_container_width=True):
                 auth.logout()
-            st.markdown(
-                '<div style="font-size:10px;color:#5A6275;margin-top:6px;line-height:1.5">v2.1 · produto interno · conectado: AdriLar</div>',
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            '<div style="font-size:10px;color:#5A6275;margin-top:6px;line-height:1.5">v2.2 · produto interno · conectado: AdriLar</div>',
+            unsafe_allow_html=True,
+        )
