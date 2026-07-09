@@ -75,6 +75,12 @@ def _clausula_periodo(clauses: list, params: dict, data_ini, data_fim, col: str 
 def load_pedidos(data_ini=None, data_fim=None, status=None, tipo_pedido=None, id_vendedor=None, id_empresa=None) -> pd.DataFrame:
     clauses = ["1=1"]
     params = {}
+
+    # Período padrão: últimos 90 dias quando nenhum filtro de data é informado,
+    # para não carregar a tabela inteira sem filtro de período.
+    if not data_ini and not data_fim:
+        data_ini = date.today() - timedelta(days=90)
+
     _clausula_periodo(clauses, params, data_ini, data_fim)
 
     if status:
@@ -111,6 +117,7 @@ def load_pedidos(data_ini=None, data_fim=None, status=None, tipo_pedido=None, id
         LEFT JOIN vendedor_map vm ON vm.id_vendedor = p.id_vendedor
         WHERE {where}
         ORDER BY p.data DESC
+        LIMIT 5000
     """
     return _query(sql, params)
 
