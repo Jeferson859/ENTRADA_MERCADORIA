@@ -65,6 +65,7 @@ def render(active: str = ""):
         if auth.is_admin():
             st.page_link("pages/Dashboard_Vendas.py", label="Vendas", icon="📊")
             st.page_link("pages/Consignado_x_Venda.py", label="Consignado × Venda", icon="🤝")
+            st.page_link("pages/Custos_Margem.py", label="Custos & Margem", icon="💰")
         if auth.tem_acesso("pedidos"):
             st.page_link("app.py", label="Pedidos", icon="📋")
         if auth.is_admin():

@@ -17,14 +17,17 @@ Perfis:
   - empresa ..... vê apenas os dados da empresa vinculada (id_empresa).
 
 No primeiro acesso, se não houver nenhum usuário, é criado o usuário
-`admin` com a senha do secret ADMIN_SENHA (ou APP_SENHA como reserva,
-ou "admin123" se nenhum secret existir — troque imediatamente).
+`admin` com a senha do secret ADMIN_SENHA (ou APP_SENHA como reserva).
+Sem esse secret o app NÃO cria o admin — configure antes do 1º acesso.
 """
 import base64
 import hashlib
+import hmac
 import json
 import os
 import secrets as _secrets
+import string
+import time
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -140,7 +143,14 @@ def init_usuarios():
         )
         st.stop()
     if not usuarios:
-        senha = _get_secret("ADMIN_SENHA", _get_secret("APP_SENHA", "admin123"))
+        senha = _get_secret("ADMIN_SENHA", _get_secret("APP_SENHA"))
+        if not senha:
+            st.error(
+                "Nenhum usuário cadastrado e o secret **ADMIN_SENHA** não está "
+                "configurado. Adicione ADMIN_SENHA nos Secrets do app (ou no .env) "
+                "para criar o usuário admin inicial com segurança."
+            )
+            st.stop()
         salt = _secrets.token_hex(16)
         usuarios = [{
             "id": 1,
@@ -229,12 +239,31 @@ def _alterar(usuario: str, mensagem: str, fn):
     _salvar(usuarios, sha, mensagem)
 
 
-def alterar_senha(usuario: str, nova_senha: str):
+def alterar_senha(usuario: str, nova_senha: str, forcar_troca: bool = False):
     salt = _secrets.token_hex(16)
     def fn(u):
         u["senha_hash"] = _hash(nova_senha, salt)
         u["salt"] = salt
+        u["trocar_senha"] = bool(forcar_troca)
     _alterar(usuario, f"Senha alterada: {usuario}", fn)
+
+
+def gerar_senha_temporaria(tamanho: int = 10) -> str:
+    alfabeto = string.ascii_letters + string.digits
+    return "".join(_secrets.choice(alfabeto) for _ in range(tamanho))
+
+
+def resetar_senha_temporaria(usuario: str) -> str:
+    """Gera senha temporária e obriga o usuário a trocá-la no próximo login.
+    Devolve a senha em claro UMA vez, para o admin repassar ao usuário."""
+    temp = gerar_senha_temporaria()
+    salt = _secrets.token_hex(16)
+    def fn(u):
+        u["senha_hash"] = _hash(temp, salt)
+        u["salt"] = salt
+        u["trocar_senha"] = True
+    _alterar(usuario, f"Senha temporária gerada: {usuario}", fn)
+    return temp
 
 
 def definir_ativo(usuario: str, ativo: bool):
@@ -262,13 +291,14 @@ def autenticar(usuario: str, senha: str):
     usuario = usuario.strip().lower()
     for u in usuarios:
         if u["usuario"] == usuario and u.get("ativo", True):
-            if _hash(senha, u["salt"]) == u["senha_hash"]:
+            if hmac.compare_digest(_hash(senha, u["salt"]), u["senha_hash"]):
                 return {
                     "usuario": u["usuario"],
                     "perfil": u["perfil"],
                     "id_empresa": u.get("id_empresa"),
                     "nome_empresa": _nome_empresa(u.get("id_empresa")),
                     "modulos": u.get("modulos"),  # None = todos
+                    "trocar_senha": bool(u.get("trocar_senha", False)),
                 }
             return None
     return None
@@ -326,11 +356,38 @@ def logout():
     st.rerun()
 
 
+def _forcar_troca_senha(u):
+    """Tela de troca obrigatória quando a senha é temporária."""
+    st.warning("🔑 Sua senha é temporária. Defina uma nova senha para continuar.")
+    with st.form("trocar_senha_form"):
+        n1 = st.text_input("Nova senha", type="password", placeholder="mín. 6 caracteres")
+        n2 = st.text_input("Confirmar nova senha", type="password")
+        ok = st.form_submit_button("Salvar nova senha", use_container_width=True)
+    if ok:
+        if len(n1) < 6:
+            st.error("A senha deve ter pelo menos 6 caracteres.")
+        elif n1 != n2:
+            st.error("As senhas não conferem.")
+        else:
+            alterar_senha(u["usuario"], n1)
+            st.session_state["usuario"]["trocar_senha"] = False
+            st.success("Senha alterada! Redirecionando...")
+            st.rerun()
+    st.stop()
+
+
+_MAX_TENTATIVAS = 5
+_BLOQUEIO_SEGUNDOS = 300  # 5 minutos
+
+
 def require_login():
     """Exige login. Bloqueia a página até o usuário se autenticar."""
     init_usuarios()
-    if usuario_atual():
-        return st.session_state["usuario"]
+    u = usuario_atual()
+    if u:
+        if u.get("trocar_senha"):
+            _forcar_troca_senha(u)
+        return u
 
     st.markdown(
         """
@@ -369,12 +426,26 @@ def require_login():
         senha = st.text_input("Senha", type="password", placeholder="••••••••")
         ok = st.form_submit_button("Entrar", use_container_width=True)
     if ok:
+        bloqueado_ate = st.session_state.get("login_bloqueado_ate", 0)
+        if time.time() < bloqueado_ate:
+            restante = int(bloqueado_ate - time.time())
+            st.error(f"Muitas tentativas incorretas. Aguarde {restante}s para tentar de novo.")
+            st.stop()
         with st.spinner("Verificando..."):
             user = autenticar(usuario, senha)
         if user:
+            st.session_state.pop("login_tentativas", None)
+            st.session_state.pop("login_bloqueado_ate", None)
             st.session_state["usuario"] = user
             st.rerun()
-        st.error("Usuário ou senha incorretos (ou usuário desativado).")
+        tent = st.session_state.get("login_tentativas", 0) + 1
+        st.session_state["login_tentativas"] = tent
+        if tent >= _MAX_TENTATIVAS:
+            st.session_state["login_bloqueado_ate"] = time.time() + _BLOQUEIO_SEGUNDOS
+            st.session_state["login_tentativas"] = 0
+            st.error("Muitas tentativas incorretas. Login bloqueado por 5 minutos.")
+        else:
+            st.error(f"Usuário ou senha incorretos (ou usuário desativado). Tentativa {tent}/{_MAX_TENTATIVAS}.")
     st.stop()
 
 
