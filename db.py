@@ -598,72 +598,9 @@ def load_produtos_por_tipo(tipo_pedido: str = "PRE-VENDA", data_ini=None, data_f
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CUSTOS E MARGEM — pages/Custos_Margem.py
-# (requer a coluna produto.custo — rode scripts/adicionar_custo.sql)
-# ══════════════════════════════════════════════════════════════════════════════
-
-def load_custos_produtos() -> pd.DataFrame:
-    """Lista produtos com o custo cadastrado (NULL = sem custo)."""
-    sql = """
-        SELECT id_produto, nome_produto, custo
-        FROM produto
-        ORDER BY nome_produto
-    """
-    return _query(sql)
-
-
-def salvar_custos_produtos(alteracoes: dict) -> int:
-    """Grava custos alterados. alteracoes: {id_produto: custo}. Devolve qtd gravada."""
-    if not alteracoes:
-        return 0
-    engine = get_engine()
-    with engine.begin() as conn:
-        for id_produto, custo in alteracoes.items():
-            conn.execute(
-                text("UPDATE produto SET custo = :c WHERE id_produto = :i"),
-                {"c": None if custo is None else float(custo), "i": int(id_produto)},
-            )
-    return len(alteracoes)
-
-
-def load_margem_produtos(data_ini=None, data_fim=None, tipo_pedido=None,
-                         id_empresa=None) -> pd.DataFrame:
-    """Faturamento × custo × lucro × margem por produto (itens ativos de
-    pedidos válidos). Produtos sem custo cadastrado vêm com sem_custo=True."""
-    clauses = [_FILTRO_VALIDO, "COALESCE(pi.status, 'ATIVO') = 'ATIVO'"]
-    params = {}
-    _clausula_periodo(clauses, params, data_ini, data_fim)
-    if tipo_pedido:
-        clauses.append("p.tipo_pedido = :tipo_pedido")
-        params["tipo_pedido"] = tipo_pedido
-    if id_empresa is not None:
-        clauses.append("p.id_vendedor IN (SELECT id_vendedor FROM vendedor WHERE id_empresa = :id_empresa)")
-        params["id_empresa"] = int(id_empresa)
-    where = " AND ".join(clauses)
-    sql = f"""
-        SELECT pr.nome_produto AS produto,
-               SUM(pi.quantidade)                                     AS quantidade,
-               ROUND(SUM(pi.valor_total)::numeric, 2)                 AS faturamento,
-               ROUND(SUM(pi.quantidade * COALESCE(pr.custo, 0))::numeric, 2) AS custo_total,
-               ROUND((SUM(pi.valor_total)
-                      - SUM(pi.quantidade * COALESCE(pr.custo, 0)))::numeric, 2) AS lucro,
-               ROUND((100 * (SUM(pi.valor_total)
-                      - SUM(pi.quantidade * COALESCE(pr.custo, 0)))
-                      / NULLIF(SUM(pi.valor_total), 0))::numeric, 1)  AS margem_pct,
-               (MAX(pr.custo) IS NULL OR MAX(pr.custo) = 0)           AS sem_custo
-        FROM pedido_itens pi
-        JOIN pedido p   ON p.id = pi.id_pedido
-        JOIN produto pr ON pr.id_produto = pi.id_produto
-        WHERE {where}
-        GROUP BY pr.nome_produto
-        ORDER BY lucro DESC
-    """
-    return _query(sql, params)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # CUSTO POR REGIÃO — pages/Custos_Margem.py
-# (requer scripts/custo_regiao.sql + carga da planilha)
+# Os custos vivem em dados/custos.csv (no repositório) — o banco recebe
+# SOMENTE consultas de leitura; o cruzamento é feito em pandas.
 # ══════════════════════════════════════════════════════════════════════════════
 
 # CEP do cliente → UF (mesmas faixas da aba vendedor × estado, + TO)
@@ -682,41 +619,9 @@ _ESTADO_CASE = r"""
 """
 
 
-def importar_custos_regiao(registros: list[dict]) -> int:
-    """Upsert em produto_custo_regiao.
-    registros: [{codigo, uf, custo, valor_venda, fornecedor}, ...]"""
-    if not registros:
-        return 0
-    engine = get_engine()
-    sql = text("""
-        INSERT INTO produto_custo_regiao (codigo, uf, custo, valor_venda, fornecedor)
-        VALUES (:codigo, :uf, :custo, :valor_venda, :fornecedor)
-        ON CONFLICT (codigo, uf) DO UPDATE
-        SET custo = EXCLUDED.custo, valor_venda = EXCLUDED.valor_venda,
-            fornecedor = EXCLUDED.fornecedor, atualizado_em = NOW()
-    """)
-    with engine.begin() as conn:
-        conn.execute(sql, registros)
-    return len(registros)
-
-
-def load_custos_regiao() -> pd.DataFrame:
-    """Tabela de custos por região, uma linha por produto × UF."""
-    sql = """
-        SELECT pcr.codigo, pcr.uf, pcr.custo, pcr.valor_venda, pcr.fornecedor,
-               pr.nome_produto,
-               ROUND((100 * (pcr.valor_venda - pcr.custo)
-                     / NULLIF(pcr.valor_venda, 0))::numeric, 1) AS margem_tabela_pct
-        FROM produto_custo_regiao pcr
-        LEFT JOIN produto pr ON pr.cod_barras = pcr.codigo
-        ORDER BY pcr.codigo, pcr.uf
-    """
-    return _query(sql)
-
-
-def load_margem_regiao(data_ini=None, data_fim=None, uf=None, tipo_pedido=None) -> pd.DataFrame:
-    """Margem REAL por produto × região: vendas (itens ativos de pedidos
-    válidos) cruzadas com o custo da UF do cliente do pedido."""
+def load_vendas_produto_uf(data_ini=None, data_fim=None, tipo_pedido=None) -> pd.DataFrame:
+    """SOMENTE LEITURA: vendas (itens ativos de pedidos válidos) agregadas por
+    produto × UF do cliente. O custo é cruzado depois, em pandas, com o CSV."""
     clauses = [_FILTRO_VALIDO, "COALESCE(pi.status, 'ATIVO') = 'ATIVO'"]
     params = {}
     _clausula_periodo(clauses, params, data_ini, data_fim)
@@ -724,56 +629,17 @@ def load_margem_regiao(data_ini=None, data_fim=None, uf=None, tipo_pedido=None) 
         clauses.append("p.tipo_pedido = :tipo_pedido")
         params["tipo_pedido"] = tipo_pedido
     where = " AND ".join(clauses)
-    filtro_uf = ""
-    if uf:
-        filtro_uf = "WHERE t.uf = :uf"
-        params["uf"] = uf
     sql = f"""
-        WITH base AS (
-            SELECT pr.nome_produto AS produto,
-                   pr.cod_barras   AS codigo,
-                   {_ESTADO_CASE}  AS uf,
-                   pi.quantidade,
-                   pi.valor_total
-            FROM pedido_itens pi
-            JOIN pedido p    ON p.id = pi.id_pedido
-            JOIN produto pr  ON pr.id_produto = pi.id_produto
-            LEFT JOIN clientes c ON c.id_cliente = p.id_cliente
-            WHERE {where}
-        ),
-        t AS (
-            SELECT b.produto, b.uf,
-                   SUM(b.quantidade)                                    AS quantidade,
-                   ROUND(SUM(b.valor_total)::numeric, 2)                AS faturamento,
-                   ROUND(SUM(b.quantidade * pcr.custo)::numeric, 2)     AS custo_total,
-                   BOOL_OR(pcr.custo IS NULL)                           AS sem_custo
-            FROM base b
-            LEFT JOIN produto_custo_regiao pcr
-                   ON pcr.codigo = b.codigo AND pcr.uf = b.uf
-            GROUP BY b.produto, b.uf
-        )
-        SELECT t.produto, t.uf, t.quantidade, t.faturamento,
-               t.custo_total,
-               ROUND((t.faturamento - COALESCE(t.custo_total, 0))::numeric, 2) AS lucro,
-               ROUND((100 * (t.faturamento - COALESCE(t.custo_total, 0))
-                     / NULLIF(t.faturamento, 0))::numeric, 1)                  AS margem_pct,
-               t.sem_custo
-        FROM t
-        {filtro_uf}
-        ORDER BY lucro DESC
+        SELECT pr.cod_barras                       AS codigo,
+               pr.nome_produto                     AS produto,
+               {_ESTADO_CASE}                      AS uf,
+               SUM(pi.quantidade)                  AS quantidade,
+               ROUND(SUM(pi.valor_total)::numeric, 2) AS faturamento
+        FROM pedido_itens pi
+        JOIN pedido p    ON p.id = pi.id_pedido
+        JOIN produto pr  ON pr.id_produto = pi.id_produto
+        LEFT JOIN clientes c ON c.id_cliente = p.id_cliente
+        WHERE {where}
+        GROUP BY pr.cod_barras, pr.nome_produto, uf
     """
     return _query(sql, params)
-
-
-def load_margem_por_uf(data_ini=None, data_fim=None, tipo_pedido=None) -> pd.DataFrame:
-    """Resumo da margem real agregada por UF."""
-    df = load_margem_regiao(data_ini, data_fim, tipo_pedido=tipo_pedido)
-    if df.empty:
-        return df
-    g = (df.groupby("uf", as_index=False)
-           .agg(faturamento=("faturamento", "sum"),
-                custo_total=("custo_total", "sum"),
-                lucro=("lucro", "sum"),
-                produtos_sem_custo=("sem_custo", "sum")))
-    g["margem_pct"] = (100 * g["lucro"] / g["faturamento"]).round(1)
-    return g.sort_values("faturamento", ascending=False)
