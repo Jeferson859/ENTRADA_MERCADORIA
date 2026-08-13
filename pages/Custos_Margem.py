@@ -106,10 +106,11 @@ def preparar(vendas: pd.DataFrame) -> pd.DataFrame:
                  how="left", suffixes=("", "_csv"))
     df = df.drop(columns=[c for c in ["codigo_csv"] if c in df.columns])
     df["custo_total"] = (df["quantidade"] * df["custo"]).round(2)
-    df["lucro"] = (df["faturamento"] - df["custo_total"].fillna(0)).round(2)
+    # SEM custo => lucro/margem ficam VAZIOS (nunca lucro = faturamento).
+    df["lucro"] = (df["faturamento"] - df["custo_total"]).round(2)
     df["margem_pct"] = (100 * df["lucro"] / df["faturamento"].replace(0, pd.NA)).round(1)
     df["sem_custo"] = df["custo"].isna()
-    return df.sort_values("lucro", ascending=False)
+    return df.sort_values("lucro", ascending=False, na_position="last")
 
 
 # ── filtros compartilhados ────────────────────────────────────────────────────
@@ -152,30 +153,49 @@ with tab_real:
     if exibir.empty:
         st.info("Nada encontrado com esses filtros.")
     else:
-        fat = float(exibir["faturamento"].sum())
-        custo_t = float(exibir["custo_total"].fillna(0).sum())
-        lucro = float(exibir["lucro"].sum())
-        margem = (100 * lucro / fat) if fat else 0
+        # ── SEPARAÇÃO: só entra na conta o que tem custo conhecido ────────────
+        com_custo = exibir[~exibir["sem_custo"]]
+        sem_custo = exibir[exibir["sem_custo"]]
 
+        fat_total = float(exibir["faturamento"].sum())
+        fat = float(com_custo["faturamento"].sum())
+        custo_t = float(com_custo["custo_total"].sum())
+        lucro = float(com_custo["lucro"].sum())
+        margem = (100 * lucro / fat) if fat else 0
+        cobertura = (100 * fat / fat_total) if fat_total else 0
+
+        st.markdown("#### ✅ Base confiável — apenas itens com custo conhecido")
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("Faturamento", f"R$ {fat:,.2f}")
         k2.metric("Custo", f"R$ {custo_t:,.2f}")
         k3.metric("Lucro bruto", f"R$ {lucro:,.2f}")
         k4.metric("Margem", f"{margem:.1f}%")
+        st.caption(f"Cobertura: {cobertura:.1f}% do faturamento do período "
+                   f"({len(com_custo)} de {len(exibir)} linhas). "
+                   "Itens sem custo NÃO entram em nenhum número acima.")
 
-        sem = int(exibir["sem_custo"].sum())
-        if sem:
-            fat_sem = float(exibir.loc[exibir["sem_custo"], "faturamento"].sum())
-            st.warning(
-                f"⚠️ {sem} de {len(exibir)} linhas sem custo (R$ {fat_sem:,.2f} de faturamento). "
-                "O lucro delas aparece igual ao faturamento, inflando o total. "
-                "Veja a aba 🔎 Diagnóstico."
-            )
+        if not sem_custo.empty:
+            fat_sem = float(sem_custo["faturamento"].sum())
+            st.markdown("#### ⚠️ Fora da conta — itens sem custo cadastrado")
+            s1, s2, s3 = st.columns(3)
+            s1.metric("Linhas de fora", len(sem_custo))
+            s2.metric("Faturamento de fora", f"R$ {fat_sem:,.2f}")
+            s3.metric("% do período", f"{100*fat_sem/fat_total:.1f}%" if fat_total else "—")
+            with st.expander(f"Ver os {len(sem_custo)} itens sem custo"):
+                st.dataframe(
+                    sem_custo[["codigo", "produto", "uf", "quantidade", "faturamento"]]
+                    .sort_values("faturamento", ascending=False)
+                    .rename(columns={"codigo": "Código", "produto": "Produto", "uf": "UF",
+                                     "quantidade": "Qtd", "faturamento": "Faturamento (R$)"}),
+                    use_container_width=True, hide_index=True,
+                )
+            st.caption("Estes itens ficam de fora do lucro e da margem para não gerar número falso. "
+                       "Cadastre o custo deles na planilha para incorporá-los.")
 
         # comparativo normal × defeito
-        if filtro_def == "Todos" and df["defeito"].any():
+        if filtro_def == "Todos" and com_custo["defeito"].any():
             st.subheader("Normal × Com defeito (LD)")
-            comp = (exibir.assign(tipo_item=exibir["defeito"].map({False: "Normal", True: "Com defeito (LD)"}))
+            comp = (com_custo.assign(tipo_item=com_custo["defeito"].map({False: "Normal", True: "Com defeito (LD)"}))
                           .groupby("tipo_item", as_index=False)
                           .agg(itens=("codigo", "count"),
                                qtd=("quantidade", "sum"),
@@ -196,32 +216,32 @@ with tab_real:
 
         if uf_sel == "(todos)":
             st.subheader("Resumo por estado")
-            res = (exibir.groupby("uf", as_index=False)
-                         .agg(faturamento=("faturamento", "sum"),
-                              custo=("custo_total", "sum"),
-                              lucro=("lucro", "sum"),
-                              sem_custo=("sem_custo", "sum")))
+            res = (com_custo.groupby("uf", as_index=False)
+                            .agg(faturamento=("faturamento", "sum"),
+                                 custo=("custo_total", "sum"),
+                                 lucro=("lucro", "sum")))
             res["margem_pct"] = (100 * res["lucro"] / res["faturamento"].replace(0, pd.NA)).round(1)
             st.dataframe(
                 res.rename(columns={"uf": "UF", "faturamento": "Faturamento (R$)",
                                     "custo": "Custo (R$)", "lucro": "Lucro (R$)",
-                                    "margem_pct": "Margem %", "sem_custo": "Linhas sem custo"}),
+                                    "margem_pct": "Margem %"}),
                 use_container_width=True, hide_index=True,
             )
+            st.caption("Somente itens com custo conhecido.")
 
         st.subheader("Margem por produto × estado")
         st.dataframe(
-            exibir[["codigo", "produto", "uf", "defeito", "quantidade", "faturamento",
-                    "custo_total", "lucro", "margem_pct", "sem_custo"]].rename(columns={
+            com_custo[["codigo", "produto", "uf", "defeito", "quantidade", "faturamento",
+                       "custo_total", "lucro", "margem_pct"]].rename(columns={
                 "codigo": "Código", "produto": "Produto", "uf": "UF", "defeito": "Defeito (LD)?",
                 "quantidade": "Qtd", "faturamento": "Faturamento (R$)",
                 "custo_total": "Custo (R$)", "lucro": "Lucro (R$)",
-                "margem_pct": "Margem %", "sem_custo": "Sem custo?"}),
+                "margem_pct": "Margem %"}),
             use_container_width=True, hide_index=True,
         )
 
         st.subheader("Top 15 — lucro")
-        top = exibir.dropna(subset=["lucro"]).head(15)
+        top = com_custo.dropna(subset=["lucro"]).head(15)
         st.bar_chart(top.assign(rotulo=top["produto"].str.slice(0, 28) + " (" + top["uf"] + ")")
                         .set_index("rotulo")["lucro"])
 
